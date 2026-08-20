@@ -23,6 +23,7 @@ nvidia-open-dkms
 nvidia-settings
 nvidia-utils
 os-prober
+pamixer
 pipewire-alsa
 pipewire-pulse
 polkit-kde-agent
