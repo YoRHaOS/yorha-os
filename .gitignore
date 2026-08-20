@@ -1,0 +1,6 @@
+*.log
+*.bak
+efi-backup-*/
+loader-backup-*/
+*.key
+*.pem
