@@ -6,3 +6,8 @@ awww
 
 # Used by Quickshell lockscreen for PAM password verification
 pamtester
+
+# Local fix (not in upstream Unit-3): hyprland.conf binds SUPER+M to `spotify` and has a
+# window rule / special workspace for it, but it was in no package list. The official
+# `spotify` client is AUR-only; provides the /usr/bin/spotify the bind calls.
+spotify
