@@ -124,3 +124,35 @@ integration into `yorha-os` must reproduce the wanted behaviors deliberately:
   background `sudo -v` keep-alive loop; a `--vm`/`UNIT3_VM=1` mode `sed`-patches configs
   to use software OpenGL (llvmpipe) for Quickshell + Kitty; runs under `set -euo pipefail`
   and cleans up its own temp clone on exit.
+
+## Local modifications vs upstream
+
+Changes made in this repo that diverge from samyns' original Unit-3, so the divergence
+stays visible. All are in `profiles/unit3/`; nothing else was touched.
+
+### `config/hypr/hyprland.conf`
+- **Added a Quickshell-independent fallback lock.** New bind
+  `bind = SUPER SHIFT, L, exec, hyprlock` runs `hyprlock` directly so the screen still
+  locks when Quickshell (`qs`) is down. The upstream Quickshell lock
+  (`bindr = SUPER, L, exec, ~/.config/quickshell/lock.sh`) is unchanged. Upstream shipped
+  `hyprlock.conf` and `hypr/lock.sh` but never wired them to any bind.
+- **Disabled the login-time auto-lock.** Commented out
+  `exec-once = ~/.config/quickshell/lock.sh` (it locked the screen on every login and
+  broke login entirely if `qs` failed). Left in place, commented, with a note, so it is
+  trivial to re-enable.
+- **Made dunst a fallback instead of killing it unconditionally.** Upstream ran
+  `exec-once = pkill dunst` / `pkill mako` / `pkill swaync` on every login, which left the
+  system with **no** notification daemon whenever `qs` failed. Now `pkill mako` and
+  `pkill swaync` are kept (those daemons would conflict with Quickshell for the
+  `org.freedesktop.Notifications` DBus name), but the unconditional `pkill dunst` is
+  replaced with `exec-once = sleep 5 && pgrep -x qs >/dev/null || dunst` — dunst starts
+  only if `qs` did not come up, so it never fights `qs` for the bus when `qs` is healthy
+  but preserves notifications when it is not.
+
+### `packages/aur.txt`
+- **Added `spotify`** (upstream fix). `hyprland.conf` binds `SUPER+M` to `spotify` and has
+  a window rule / special workspace for it, but it was in no package list. The official
+  Spotify client is AUR-only and provides the `/usr/bin/spotify` the bind invokes.
+
+### `packages/pacman.txt`
+- **Removed a duplicate `python-pillow`** entry (it was listed twice upstream).
