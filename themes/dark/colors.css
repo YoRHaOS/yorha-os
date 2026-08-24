@@ -1,0 +1,14 @@
+/* YoRHa OS — Dark theme. See docs/visual-identity.md.
+   Derived ramp (not a literal swap of the light table): same hues and low
+   saturation, new lightness values chosen to preserve light mode's contrast
+   relationships. Same eight variable names across every mode. */
+:root{
+  --sand:      #23211a;   /* base background — warm near-black */
+  --sand-deep: #1b1a13;   /* recessed shade (darker than base, still) */
+  --panel:     #2f2c22;   /* framed-panel fill (lighter than base — still lifts up) */
+  --ink:       #e4dec8;   /* primary text (brightest — most contrast on the dark page) */
+  --ink-soft:  #b3ac96;   /* body text (clearly dimmer than primary) */
+  --ink-faint: #8d8873;   /* labels / muted — the shared neutral pivot */
+  --rule:      #57523f;   /* hairlines — dim warm line, subtle on dark */
+  --hot:       #cf6b3f;   /* accent — lifted terracotta (retuned for dark bg) */
+}
