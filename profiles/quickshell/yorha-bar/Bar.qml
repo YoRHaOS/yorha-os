@@ -95,7 +95,7 @@ PanelWindow {
             }
             Row {
                 anchors.centerIn: parent; spacing: 6
-                Text { text: ""; color: bar.cInkSoft; font.family: bar.mono; font.pixelSize: 12 }
+                Text { text: "\uf001"; color: bar.cInkSoft; font.family: bar.mono; font.pixelSize: 12 }
                 Text {
                     text: "media"; color: bar.cInkSoft; font.family: bar.mono; font.pixelSize: 11
                     width: mediaHover.containsMouse ? implicitWidth : 0   // animate width with opacity (layout width)
@@ -137,7 +137,7 @@ PanelWindow {
             }
             Row {
                 anchors.centerIn: parent; spacing: 6
-                Text { text: ""; color: bar.cInkSoft; font.family: bar.mono; font.pixelSize: 12 }
+                Text { text: "\uf2db"; color: bar.cInkSoft; font.family: bar.mono; font.pixelSize: 12 }
                 Text {
                     text: "perf"; color: bar.cInkSoft; font.family: bar.mono; font.pixelSize: 11
                     width: perfHover.containsMouse ? implicitWidth : 0
@@ -160,12 +160,12 @@ PanelWindow {
                 id: statusRow
                 anchors.centerIn: parent
                 spacing: 12
-                Text { text: ""; color: bar.cInkSoft; font.family: bar.mono; font.pixelSize: 12 }
-                Text { text: ""; color: bar.cInkSoft; font.family: bar.mono; font.pixelSize: 12 }
-                Text { text: ""; color: bar.cInkSoft; font.family: bar.mono; font.pixelSize: 12 }
+                Text { text: "\uf1eb"; color: bar.cInkSoft; font.family: bar.mono; font.pixelSize: 12 }
+                Text { text: "\uf028"; color: bar.cInkSoft; font.family: bar.mono; font.pixelSize: 12 }
+                Text { text: "\uf240"; color: bar.cInkSoft; font.family: bar.mono; font.pixelSize: 12 }
                 Rectangle {
                     width: 22; height: 20; radius: 6; color: "transparent"
-                    Text { anchors.centerIn: parent; text: ""; color: bar.cHot; font.family: bar.mono; font.pixelSize: 13 }
+                    Text { anchors.centerIn: parent; text: "\uf013"; color: bar.cHot; font.family: bar.mono; font.pixelSize: 13 }
                     MouseArea { anchors.fill: parent; onClicked: bar.controlCenterRef.openView("home") }
                 }
             }

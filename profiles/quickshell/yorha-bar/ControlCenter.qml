@@ -256,13 +256,13 @@ PanelWindow {
                         spacing: 6
                         Repeater {
                             model: [
-                                { v: "home",    g: "" },
-                                { v: "audio",   g: "" },
-                                { v: "monitor", g: "" },
-                                { v: "network", g: "" },
-                                { v: "bluetooth", g: "" },
-                                { v: "calendar",g: "" },
-                                { v: "notify",  g: "" }
+                                { v: "home",    g: "\uf015" },
+                                { v: "audio",   g: "\uf028" },
+                                { v: "monitor", g: "\uf2db" },
+                                { v: "network", g: "\uf1eb" },
+                                { v: "bluetooth", g: "\uf294" },
+                                { v: "calendar",g: "\uf073" },
+                                { v: "notify",  g: "\uf0f3" }
                             ]
                             delegate: Rectangle {
                                 width: 34; height: 34; radius: 9
@@ -295,9 +295,9 @@ PanelWindow {
                         spacing: 10
                         Repeater {
                             model: [
-                                { g: "", act: "settings" },
-                                { g: "", act: "power" },
-                                { g: "", act: "close" }
+                                { g: "\uf013", act: "settings" },
+                                { g: "\uf011", act: "power" },
+                                { g: "\uf00d", act: "close" }
                             ]
                             delegate: Text {
                                 text: modelData.g; font.family: root.mono; font.pixelSize: 13
@@ -374,7 +374,7 @@ PanelWindow {
                                                 visible: status === Image.Ready
                                             }
                                             Text {   // placeholder when no art / loading / error
-                                                anchors.centerIn: parent; text: ""
+                                                anchors.centerIn: parent; text: "\uf001"
                                                 font.family: root.mono; font.pixelSize: 22; color: root.cInkFaint
                                                 visible: art.status !== Image.Ready
                                             }
@@ -400,12 +400,12 @@ PanelWindow {
                                             }
                                             Row {
                                                 spacing: 18; Layout.topMargin: 2
-                                                Text { text: ""; font.family: root.mono; font.pixelSize: 13; color: root.cInkSoft
+                                                Text { text: "\uf048"; font.family: root.mono; font.pixelSize: 13; color: root.cInkSoft
                                                        MouseArea { anchors.fill: parent; anchors.margins:-4; onClicked: mprev.go() } }
-                                                Text { text: root.mStatus === "Playing" ? "" : ""
+                                                Text { text: root.mStatus === "Playing" ? "\uf04c" : "\uf04b"
                                                        font.family: root.mono; font.pixelSize: 14; color: root.cHot
                                                        MouseArea { anchors.fill: parent; anchors.margins:-4; onClicked: mplay.go() } }
-                                                Text { text: ""; font.family: root.mono; font.pixelSize: 13; color: root.cInkSoft
+                                                Text { text: "\uf051"; font.family: root.mono; font.pixelSize: 13; color: root.cInkSoft
                                                        MouseArea { anchors.fill: parent; anchors.margins:-4; onClicked: mnext.go() } }
                                             }
                                         }
@@ -418,12 +418,12 @@ PanelWindow {
                                     columns: 2; rowSpacing: 8; columnSpacing: 8
                                     Repeater {
                                         model: [
-                                            { k:"wifi",  g:"", l:"WiFi" },
-                                            { k:"bt",    g:"", l:"Bluetooth" },
-                                            { k:"caf",   g:"", l:"Caffeine" },
-                                            { k:"night", g:"", l:"Night Light" },
-                                            { k:"dnd",   g:"", l:"DND" },
-                                            { k:"power", g:"", l:"Power" }
+                                            { k:"wifi",  g:"\uf1eb", l:"WiFi" },
+                                            { k:"bt",    g:"\uf294", l:"Bluetooth" },
+                                            { k:"caf",   g:"\uf0f4", l:"Caffeine" },
+                                            { k:"night", g:"\uf186", l:"Night Light" },
+                                            { k:"dnd",   g:"\uf1f6", l:"DND" },
+                                            { k:"power", g:"\uf0e7", l:"Power" }
                                         ]
                                         delegate: Rectangle {
                                             Layout.fillWidth: true; Layout.fillHeight: true
@@ -561,13 +561,13 @@ PanelWindow {
                             Eyebrow { text: "Audio" }
                             RowLayout {
                                 Layout.fillWidth: true; spacing: 12
-                                Text { text: ""; font.family: root.mono; font.pixelSize: 14; color: root.cInkSoft }
+                                Text { text: "\uf028"; font.family: root.mono; font.pixelSize: 14; color: root.cInkSoft }
                                 Slider { Layout.fillWidth: true; from:0; to:100; value:50
                                          onMoved: value > 50 ? (volUp.running=true) : (volDown.running=true) }
                             }
                             RowLayout {
                                 Layout.fillWidth: true; spacing: 12
-                                Text { text: ""; font.family: root.mono; font.pixelSize: 14; color: root.cInkSoft }
+                                Text { text: "\uf185"; font.family: root.mono; font.pixelSize: 14; color: root.cInkSoft }
                                 Slider { Layout.fillWidth: true; from:0; to:100; value:70
                                          onMoved: value > 70 ? (briUp.running=true) : (briDown.running=true) }
                             }
