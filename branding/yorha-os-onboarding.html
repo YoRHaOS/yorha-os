@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YoRHa OS — Onboarding</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:ital@0;1&family=Noto+Kufi+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --sand:#d3cdb6;
+    --sand-deep:#c6bfa4;
+    --ink:#4a4739;
+    --ink-soft:#6b6754;
+    --ink-faint:#8d8873;
+    --rule:#8d8873;
+    --hot:#bb5b32;
+    --panel:#dcd7c3;
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0}
+
+  html,body{height:100%}
+
+  body{
+    background:var(--sand);
+    color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* scanline overlay — the signature NieR menu texture */
+  body::after{
+    content:"";
+    position:fixed;
+    inset:0;
+    pointer-events:none;
+    background:repeating-linear-gradient(
+      to bottom,
+      rgba(74,71,57,.055) 0px,
+      rgba(74,71,57,.055) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    z-index:60;
+  }
+
+  .stage{
+    position:relative;
+    width:min(1040px,94vw);
+    height:min(640px,88vh);
+  }
+
+  /* framed panel */
+  .frame{
+    position:absolute;
+    inset:0;
+    border:1px solid var(--rule);
+    background:var(--panel);
+  }
+  .frame::before{
+    content:"";
+    position:absolute;
+    inset:7px;
+    border:1px solid rgba(141,136,115,.45);
+    pointer-events:none;
+  }
+
+  /* corner ticks */
+  .tick{position:absolute;width:13px;height:13px;border:0 solid var(--ink);z-index:5}
+  .tick.tl{top:-1px;left:-1px;border-top-width:2px;border-left-width:2px}
+  .tick.tr{top:-1px;right:-1px;border-top-width:2px;border-right-width:2px}
+  .tick.bl{bottom:-1px;left:-1px;border-bottom-width:2px;border-left-width:2px}
+  .tick.br{bottom:-1px;right:-1px;border-bottom-width:2px;border-right-width:2px}
+
+  /* top + bottom chrome */
+  .chrome{
+    position:absolute;
+    left:34px;right:34px;
+    font-family:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+    font-size:10px;
+    letter-spacing:.22em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+    display:flex;
+    justify-content:space-between;
+    z-index:10;
+  }
+  .chrome.top{top:26px}
+  .chrome.bot{bottom:24px}
+
+  /* slides */
+  .slides{position:absolute;inset:0}
+  .slide{
+    position:absolute;
+    inset:0;
+    padding:74px 62px 66px;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    opacity:0;
+    visibility:hidden;
+    transition:opacity .34s ease;
+  }
+  .slide.on{opacity:1;visibility:visible}
+
+  .eyebrow{
+    font-family:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+    font-size:10px;
+    letter-spacing:.3em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+    margin-bottom:20px;
+    display:flex;
+    align-items:center;
+    gap:12px;
+  }
+  .eyebrow::after{
+    content:"";
+    flex:1;
+    height:1px;
+    background:var(--rule);
+    opacity:.55;
+  }
+
+  h1{
+    font-size:clamp(34px,5.4vw,58px);
+    font-weight:400;
+    letter-spacing:.02em;
+    line-height:1.06;
+  }
+  h2{
+    font-size:clamp(25px,3.5vw,38px);
+    font-weight:400;
+    line-height:1.14;
+    margin-bottom:22px;
+  }
+  .lede{
+    font-size:clamp(15px,1.85vw,19px);
+    line-height:1.62;
+    color:var(--ink-soft);
+    max-width:62ch;
+  }
+  .lede + .lede{margin-top:14px}
+  strong{font-weight:600;color:var(--ink)}
+
+  .rule{height:1px;background:var(--rule);opacity:.5;margin:26px 0}
+
+  /* command block */
+  .cmd{
+    font-family:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+    font-size:clamp(12px,1.5vw,15px);
+    background:var(--ink);
+    color:var(--sand);
+    padding:16px 20px;
+    margin:24px 0 18px;
+    line-height:1.6;
+    word-break:break-all;
+    border-left:3px solid var(--hot);
+  }
+  .cmd .prompt{color:var(--hot);user-select:none}
+  .caret{
+    display:inline-block;
+    width:8px;
+    height:1.05em;
+    background:var(--sand);
+    vertical-align:-2px;
+    margin-left:2px;
+    animation:blink 1s step-end infinite;
+  }
+  @keyframes blink{50%{opacity:0}}
+
+  /* stepped lists */
+  ol.steps{list-style:none;counter-reset:s;margin-top:8px}
+  ol.steps li{
+    counter-increment:s;
+    position:relative;
+    padding-left:52px;
+    margin-bottom:17px;
+    font-size:clamp(14px,1.7vw,17px);
+    line-height:1.5;
+    color:var(--ink-soft);
+  }
+  ol.steps li::before{
+    content:counter(s,decimal-leading-zero);
+    position:absolute;
+    left:0;top:1px;
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:12px;
+    letter-spacing:.1em;
+    color:var(--hot);
+    border:1px solid var(--rule);
+    padding:3px 7px;
+  }
+  ol.steps code{
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:.88em;
+    background:rgba(74,71,57,.09);
+    padding:2px 6px;
+  }
+
+  ul.plain{list-style:none;margin-top:6px}
+  ul.plain li{
+    position:relative;
+    padding-left:26px;
+    margin-bottom:14px;
+    font-size:clamp(14px,1.7vw,17px);
+    line-height:1.55;
+    color:var(--ink-soft);
+  }
+  ul.plain li::before{
+    content:"";
+    position:absolute;
+    left:0;top:.62em;
+    width:9px;height:9px;
+    border:1px solid var(--ink-faint);
+    transform:rotate(45deg);
+  }
+  ul.plain li.yes::before{background:var(--ink-soft);border-color:var(--ink-soft)}
+  ul.plain li.no::before{background:transparent;border-style:dashed}
+
+  .note{
+    margin-top:22px;
+    border-left:2px solid var(--hot);
+    padding:2px 0 2px 16px;
+    font-size:clamp(13px,1.55vw,15px);
+    line-height:1.55;
+    color:var(--ink-soft);
+    max-width:60ch;
+  }
+
+  /* title card */
+  .title-card{align-items:center;text-align:center;justify-content:center}
+  .digits{
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:clamp(2.6px,.72vw,6.4px);
+    line-height:1.06;
+    white-space:pre;
+    text-align:left;
+    display:block;
+    width:fit-content;
+    margin:0 auto 20px;
+    color:var(--ink);
+    opacity:.5;
+  }
+  .title-card h1{margin-bottom:14px;font-size:clamp(28px,4.2vw,46px)}
+  .title-card .sub{
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:11px;
+    letter-spacing:.32em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+  }
+
+  /* two-column compare */
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:34px;margin-top:8px}
+  .col h3{
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:10px;
+    letter-spacing:.24em;
+    text-transform:uppercase;
+    font-weight:400;
+    color:var(--ink-faint);
+    padding-bottom:9px;
+    margin-bottom:15px;
+    border-bottom:1px solid var(--rule);
+  }
+  @media (max-width:720px){.cols{grid-template-columns:1fr;gap:22px}}
+
+  /* the big rule slide */
+  .decree{
+    font-size:clamp(27px,4.4vw,46px);
+    line-height:1.18;
+    letter-spacing:.01em;
+  }
+  .decree em{font-style:normal;color:var(--hot)}
+  .branch-map{
+    display:flex;
+    gap:14px;
+    align-items:stretch;
+    margin-top:34px;
+    flex-wrap:wrap;
+  }
+  .node{
+    border:1px solid var(--rule);
+    padding:14px 18px;
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:12px;
+    letter-spacing:.06em;
+    color:var(--ink-soft);
+    background:rgba(74,71,57,.04);
+  }
+  .node.locked{border-style:double;border-width:3px;color:var(--ink)}
+  .node small{
+    display:block;
+    margin-top:6px;
+    font-size:9.5px;
+    letter-spacing:.2em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+  }
+  .arrow{
+    align-self:center;
+    font-family:ui-monospace,monospace;
+    color:var(--ink-faint);
+    font-size:15px;
+  }
+
+  /* progress */
+  .prog{
+    position:absolute;
+    left:34px;right:34px;bottom:44px;
+    height:1px;
+    background:rgba(141,136,115,.35);
+    z-index:10;
+  }
+  .prog i{
+    display:block;
+    height:100%;
+    background:var(--hot);
+    width:0;
+  }
+
+  /* controls */
+  .ctl{
+    position:absolute;
+    bottom:-46px;
+    left:0;right:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:9px;
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:10px;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+  }
+  .ctl button{
+    font:inherit;
+    letter-spacing:inherit;
+    text-transform:inherit;
+    background:transparent;
+    border:1px solid var(--rule);
+    color:var(--ink-soft);
+    padding:7px 14px;
+    cursor:pointer;
+  }
+  .ctl button:hover{background:var(--ink);color:var(--sand);border-color:var(--ink)}
+  .ctl button:focus-visible{outline:2px solid var(--hot);outline-offset:2px}
+  .ctl .count{color:var(--ink-faint);padding:0 6px}
+
+  @media (max-width:640px){
+    .slide{padding:60px 30px 58px}
+    .chrome{left:22px;right:22px}
+    .prog{left:22px;right:22px}
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    .slide{transition:none}
+    .caret{animation:none}
+    .prog i{transition:none}
+  }
+
+  /* language toggle */
+  .langtoggle{
+    font:inherit;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    background:transparent;
+    border:1px solid var(--rule);
+    color:var(--ink-soft);
+    padding:7px 12px;
+    cursor:pointer;
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:10px;
+  }
+  .langtoggle:hover{background:var(--ink);color:var(--sand);border-color:var(--ink)}
+  .langtoggle:focus-visible{outline:2px solid var(--hot);outline-offset:2px}
+  .langtoggle .cur{color:var(--hot)}
+  .langtoggle:hover .cur{color:inherit}
+
+  /* Arabic mode */
+  html[lang="ar"] body{
+    font-family:"Amiri","Noto Kufi Arabic",Georgia,serif;
+  }
+  html[lang="ar"] .slide{ text-align:right; }
+  html[lang="ar"] .title-card{ text-align:center; }
+  html[lang="ar"] .eyebrow,
+  html[lang="ar"] .chrome,
+  html[lang="ar"] .title-card .sub,
+  html[lang="ar"] .col h3,
+  html[lang="ar"] .langtoggle,
+  html[lang="ar"] .ctl button,
+  html[lang="ar"] .node small{
+    font-family:"Noto Kufi Arabic",ui-monospace,Menlo,Consolas,monospace;
+    letter-spacing:0;
+  }
+  html[lang="ar"] .cmd,
+  html[lang="ar"] .cmd *,
+  html[lang="ar"] ol.steps code,
+  html[lang="ar"] .decree code,
+  html[lang="ar"] .digits,
+  html[lang="ar"] .node{
+    direction:ltr;
+    unicode-bidi:isolate;
+    text-align:left;
+    font-family:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  }
+  html[lang="ar"] ol.steps li,
+  html[lang="ar"] ul.plain li{ padding-left:0; padding-right:52px; }
+  html[lang="ar"] ul.plain li{ padding-right:26px; }
+  html[lang="ar"] ol.steps li::before{ left:auto; right:0; }
+  html[lang="ar"] ul.plain li::before{ left:auto; right:0; }
+  html[lang="ar"] .note{
+    border-left:none;
+    border-right:2px solid var(--hot);
+    padding:2px 16px 2px 0;
+  }
+  html[lang="ar"] .eyebrow{ flex-direction:row-reverse; }
+  html[lang="ar"] .branch-map{ flex-direction:row-reverse; }
+  html[lang="ar"] .arrow{ transform:scaleX(-1); }
+  html[lang="ar"] .decree em{ font-family:ui-monospace,Menlo,Consolas,monospace; }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="frame"></div>
+  <span class="tick tl"></span><span class="tick tr"></span>
+  <span class="tick bl"></span><span class="tick br"></span>
+
+  <div class="chrome top">
+    <span data-ar="YoRHa OS // تهيئة المتعاونين">YoRHa OS // Collaborator Onboarding</span>
+    <span id="chapter">—</span>
+  </div>
+
+  <div class="slides" id="slides">
+
+    <!-- 01 -->
+    <section class="slide title-card" data-dur="6000" data-chapter="Start" data-chapter-ar="البداية">
+      <pre class="digits">                        01                  19
+                       818                  108
+                       0191                1909
+                      11018                90191
+                      10099       11       80018
+                      08100      0890      19011
+                      011981     9801     190181
+                     1990081    108081    1081901
+                     1000091    100911    1000001
+                     1981990    190089    1901981
+                     1990010    008888    1801101
+                     1980000    088988    1001001
+                     0911101 1  090198  1 1890891
+                     0001810 88 818190 01 1811100
+                     1090011 191189101109 1811010
+                      101001 081888888880 109111
+                   0188   1191 89889099 1881   1900
+                   11191000001 99900181 10081089011
+                       191  11180088081890  119
+                      11191  1  089198  1  00801
+                      980101   11100111   191198
+              09991    080 101 009  900 100 101    00990
+            1 10011100  1981110 100101 1111981  18111891 1
+            11 081 1889  1199111 1189 1118911  8191 180 11
+             1 080 9880 01911111 8100 10011010 8981 010 8
+         18010 0881 8891989    11998981    8191891 1900 18911
+       1889811090191 1981001     0108     1910991 1119010980081
+     1919190000  19011 0989889 10988111 1090080 19101  1818809181
+   181019101       1991 91881100 1990 10811819 1891       110918001
+ 0911               881 011901100 00 010801198 111               1091
+                  99811911   10910  81911   11811808
+                 88001901       100190       10810989
+                181109981      11989190      100800181
+                1918911        00998010        1008091
+               089101          09081901          181090
+               1101             100101             1900
+              081               111011               111
+             11                  9198                  01
+                                 1011
+                                  80
+                                  11</pre>
+      <h1 data-ar="الانضمام إلى YoRHa OS">Joining YoRHa&nbsp;OS</h1>
+      <p class="sub" data-ar="انضم · جهّز نظامك · لا تكتب فوق عمل غيرك">Get in · Set up · Don't overwrite anyone</p>
+    </section>
+
+    <!-- 02 -->
+    <section class="slide" data-dur="8000" data-chapter="Start" data-chapter-ar="البداية">
+      <div class="eyebrow" data-ar="ما الذي يغطيه هذا">What this covers</div>
+      <h2 data-ar="ثلاثة أشياء، بالترتيب.">Three things, in order.</h2>
+      <ol class="steps">
+        <li data-ar="الانضمام إلى منظمة GitHub.">Getting into the GitHub organisation.</li>
+        <li data-ar="تثبيت المشروع على جهاز Arch الخاص بك.">Putting the project onto your own Arch machine.</li>
+        <li data-ar="العمل مع الآخرين دون محو عملهم.">Working alongside other people without wiping their work.</li>
+      </ol>
+      <p class="note" data-ar="خذ وقتك. كل خطوة هي أمر واحد أو نقرة واحدة. لا شيء هنا يمكن أن يكسر أي شيء بشكل دائم.">Take it slowly. Every step is one command or one click. Nothing here can break anything permanently.</p>
+    </section>
+
+    <!-- 03 -->
+    <section class="slide" data-dur="9000" data-chapter="Access" data-chapter-ar="الوصول">
+      <div class="eyebrow" data-ar="الجزء الأول · الوصول">Part one · Access</div>
+      <h2 data-ar="سيتم دعوتك إلى المنظمة.">You get invited to the organisation.</h2>
+      <p class="lede" data-ar-html="يعيش المشروع على <strong>github.com/YoRHaOS/yorha-os</strong> — وهو مملوك لمنظمة، وليس لشخص واحد. يقوم أحد المالكين بإرسال دعوة لك.">The project lives at <strong>github.com/YoRHaOS/yorha-os</strong> — owned by an organisation, not by one person. An Owner sends you an invite.</p>
+      <div class="rule"></div>
+      <ol class="steps">
+        <li data-ar="تحقق من بريدك الإلكتروني، أو إشعارات GitHub.">Check your email, or your GitHub notifications.</li>
+        <li data-ar-html="اضغط على <strong>قبول الدعوة</strong>.">Click <strong>Accept invitation</strong>.</li>
+        <li data-ar="هذا كل شيء. أنت الآن في المنظمة.">That's it. You're in the org.</li>
+      </ol>
+    </section>
+
+    <!-- 04 -->
+    <section class="slide" data-dur="9500" data-chapter="Access" data-chapter-ar="الوصول">
+      <div class="eyebrow" data-ar="الجزء الأول · الوصول">Part one · Access</div>
+      <h2 data-ar="ما الذي يتيحه لك ذلك.">What that lets you do.</h2>
+      <div class="cols">
+        <div class="col">
+          <h3 data-ar="يمكنك">You can</h3>
+          <ul class="plain">
+            <li class="yes" data-ar="رفع (push) فروعك الخاصة">Push your own branches</li>
+            <li class="yes" data-ar="فتح طلبات سحب (pull requests)">Open pull requests</li>
+            <li class="yes" data-ar="مراجعة عمل الآخرين">Review other people's work</li>
+          </ul>
+        </div>
+        <div class="col">
+          <h3 data-ar="لا يمكنك">You can't</h3>
+          <ul class="plain">
+            <li class="no" data-ar-html="الدفع القسري (force-push) فوق <code>main</code>">Force-push over <code>main</code></li>
+            <li class="no" data-ar="تغيير إعدادات المستودع">Change repository settings</li>
+          </ul>
+        </div>
+      </div>
+      <p class="note" data-ar="القائمة الثانية مقصودة. إنها شبكة الأمان التي تجعل بقية هذا الفيديو صحيحًا — وليست دليلًا على انعدام الثقة.">That second list is deliberate. It's the safety net that makes the rest of this video true — not a lack of trust.</p>
+    </section>
+
+    <!-- 05 -->
+    <section class="slide" data-dur="8500" data-chapter="Setup" data-chapter-ar="الإعداد">
+      <div class="eyebrow" data-ar="الجزء الثاني · الإعداد">Part two · Setup</div>
+      <h2 data-ar="انسخ المشروع إلى جهازك.">Copy the project down.</h2>
+      <p class="lede" data-ar="أمر واحد. يقوم بسحب المشروع بالكامل — كل ملف، وكل تعديل قام به أي شخص عليه — إلى جهازك.">One command. It pulls the entire project — every file, and every change anyone has ever made to it — onto your machine.</p>
+      <div class="cmd"><span class="prompt">$ </span>git clone https://github.com/YoRHaOS/yorha-os.git ~/yorha-os<span class="caret"></span></div>
+      <p class="note" data-ar="هذه النسخة ملكك. تعديلها لا يؤثر على أي شخص آخر حتى ترسل التغييرات عمدًا.">This copy is yours. Editing it does nothing to anyone else until you deliberately send changes back.</p>
+    </section>
+
+    <!-- 06 -->
+    <section class="slide" data-dur="10000" data-chapter="Setup" data-chapter-ar="الإعداد">
+      <div class="eyebrow" data-ar="الجزء الثاني · الإعداد">Part two · Setup</div>
+      <h2 data-ar="اقرأ هذا قبل أن تتوقع وجود مثبّت.">Read this before you expect an installer.</h2>
+      <p class="lede" data-ar-html="<strong>YoRHa OS ليس توزيعة قابلة للتنزيل بعد.</strong> لا يوجد ملف ISO. حاليًا، المشروع عبارة عن مجموعة من ملفات الإعداد تُطبّقها فوق تثبيت Arch Linux موجود لديك مسبقًا."><strong>YoRHa OS is not a downloadable distro yet.</strong> There is no ISO. Right now the project is a set of configuration files you apply on top of an Arch Linux install you already have.</p>
+      <div class="rule"></div>
+      <p class="lede" data-ar="يجب أن يكون المنزل موجودًا قبل أن تتمكن من تزيينه. Arch هو المنزل. هذا المستودع هو الديكور.">The house has to exist before you can decorate it. Arch is the house. This repo is the decoration.</p>
+    </section>
+
+    <!-- 07 -->
+    <section class="slide" data-dur="8500" data-chapter="Setup" data-chapter-ar="الإعداد">
+      <div class="eyebrow" data-ar="الجزء الثاني · الإعداد · الخطوة الأولى">Part two · Setup · Step one</div>
+      <h2 data-ar="ابدأ من نظام Arch يعمل بشكل سليم.">Start from working Arch.</h2>
+      <ul class="plain">
+        <li class="yes" data-ar="Arch Linux مثبت ويعمل">Arch Linux installed and booting</li>
+        <li class="yes" data-ar="حساب مستخدم يمكنك تسجيل الدخول به">A user account you can log into</li>
+        <li class="yes" data-ar-html="أمر <code>sudo</code> يعمل"><code>sudo</code> working</li>
+        <li class="yes" data-ar="اتصال بالإنترنت متوفر">Internet connected</li>
+      </ul>
+      <p class="note" data-ar="إذا لم يتحقق أي من هذه الأربعة، توقف هنا وأصلح ذلك أولاً. كل ما يلي يفترض توفر الأربعة جميعًا.">If any of those four aren't true, stop here and fix that first. Everything below assumes all four.</p>
+    </section>
+
+    <!-- 08 -->
+    <section class="slide" data-dur="9000" data-chapter="Setup" data-chapter-ar="الإعداد">
+      <div class="eyebrow" data-ar="الجزء الثاني · الإعداد · الخطوة الثانية">Part two · Setup · Step two</div>
+      <h2 data-ar="ثبّت البرامج التي يحتاجها المشروع.">Install the programs the project needs.</h2>
+      <p class="lede" data-ar-html="يحمل المستودع قائمة تسوّق بكل حزمة. مرّر القائمة إلى <code>pacman</code> وسيقوم بتثبيتها جميعًا.">The repo carries a shopping list of every package. Feed the list to <code>pacman</code> and it installs all of them.</p>
+      <div class="cmd"><span class="prompt">$ </span>sudo pacman -S --needed - &lt; base/packages/explicit.txt<span class="caret"></span></div>
+      <p class="note" data-ar-html="شغّل هذا من داخل المجلد الذي استنسخته. <code>--needed</code> تعني أنه سيتخطى أي شيء لديك بالفعل.">Run this from inside the folder you cloned. <code>--needed</code> means it skips anything you already have.</p>
+    </section>
+
+    <!-- 09 -->
+    <section class="slide" data-dur="10000" data-chapter="Setup" data-chapter-ar="الإعداد">
+      <div class="eyebrow" data-ar="الجزء الثاني · الإعداد · الخطوة الثالثة">Part two · Setup · Step three</div>
+      <h2 data-ar="ضع ملفات الإعداد في مكانها.">Put the configuration in place.</h2>
+      <p class="lede" data-ar="هذه هي الخطوة التي تجعل سطح المكتب فعليًا يبدو ويتصرف مثل YoRHa OS — اختصارات لوحة المفاتيح، والتخطيط، كل ذلك.">This is the step that actually makes the desktop look and behave like YoRHa OS — the keybinds, the layout, all of it.</p>
+      <div class="cmd"><span class="prompt">$ </span>cp profiles/hyprland/hyprland.conf ~/.config/hypr/hyprland.conf<span class="caret"></span></div>
+      <p class="note" data-ar-html="هل تبني ملف تعريف Plasma أو GNOME بدلاً من ذلك؟ إذن أنت <em>تُنشئ</em> <code>profiles/plasma/</code>، وليس نسخ هذا الملف. نفس الشكل، مجلدك الخاص.">Building a Plasma or GNOME profile instead? Then you're <em>creating</em> <code>profiles/plasma/</code>, not copying this one. Same shape, your folder.</p>
+    </section>
+
+    <!-- 10 -->
+    <section class="slide" data-dur="9000" data-chapter="Setup" data-chapter-ar="الإعداد">
+      <div class="eyebrow" data-ar="الجزء الثاني · الإعداد">Part two · Setup</div>
+      <h2 data-ar="ثغرة واحدة بصراحة.">One honest gap.</h2>
+      <p class="lede" data-ar-html="تُنفَّذ الخطوتان الأخيرتان يدويًا. لا يوجد بعد <code>install.sh</code> يقوم بتشغيلهما نيابة عنك.">Those last two steps are done by hand. There is no <code>install.sh</code> that runs them for you yet.</p>
+      <div class="rule"></div>
+      <p class="lede" data-ar-html="ما يجعل كتابته <strong>مساهمة أولى ممتازة</strong> — سكربت صغير يثبّت الحزم وينسخ ملفات الإعداد، حتى لا يضطر أحد لكتابة هذا يدويًا مرة أخرى.">Which makes writing it <strong>an excellent first contribution</strong> — a small script that installs the packages and copies the configs, so nobody ever types this by hand again.</p>
+    </section>
+
+    <!-- 11 -->
+    <section class="slide" data-dur="8000" data-chapter="Working together" data-chapter-ar="العمل معًا">
+      <div class="eyebrow" data-ar="الجزء الثالث · العمل معًا">Part three · Working together</div>
+      <p class="decree" data-ar-html="هناك قاعدة واحدة.<br>لا تقم بالإيداع (commit) مباشرة إلى <em>main</em> أبدًا.">There is one rule.<br>Never commit straight to <em>main</em>.</p>
+      <div class="branch-map">
+        <div class="node locked">main<small data-ar="النسخة الحقيقية · محمية">The real one · protected</small></div>
+        <span class="arrow">◄──</span>
+        <div class="node">your-branch<small data-ar="مساحتك الخاصة للعمل">Your scratch space</small></div>
+      </div>
+    </section>
+
+    <!-- 12 -->
+    <section class="slide" data-dur="12000" data-chapter="Working together" data-chapter-ar="العمل معًا">
+      <div class="eyebrow" data-ar="الجزء الثالث · الحلقة">Part three · The loop</div>
+      <h2 data-ar="أربع خطوات. في كل مرة.">Four steps. Every single time.</h2>
+      <ol class="steps">
+        <li data-ar-html="<code>git pull</code> على main — ابدأ من أحدث نسخة، وليس نسخة الأسبوع الماضي."><code>git pull</code> on main — start from the newest version, not last week's.</li>
+        <li data-ar-html="<code>git checkout -b yourname/what-youre-doing</code> — مساحتك الخاصة للعمل فيها."><code>git checkout -b yourname/what-youre-doing</code> — your own space to work in.</li>
+        <li data-ar-html="<code>git commit</code> ثم <code>git push</code> — احفظ عملك، وأرسله للأعلى."><code>git commit</code> then <code>git push</code> — save your work, send it up.</li>
+        <li data-ar-html="افتح <strong>طلب سحب (pull request)</strong> — سيراجعه أحدهم قبل أن يُدمج.">Open a <strong>pull request</strong> — someone looks at it before it lands.</li>
+      </ol>
+      <p class="note" data-ar="نفس الحلقة التي استُخدمت لإضافة إعداد Hyprland. لا شيء جديد لتعلمه — فقط كررها.">Same loop that was used to add the Hyprland config. Nothing new to learn — just repeat it.</p>
+    </section>
+
+    <!-- 13 -->
+    <section class="slide" data-dur="12000" data-chapter="Working together" data-chapter-ar="العمل معًا">
+      <div class="eyebrow" data-ar="الجزء الثالث · لماذا هذا آمن">Part three · Why it's safe</div>
+      <h2 data-ar="لا يمكنكم محو عمل بعضكم البعض بصمت.">You cannot quietly wipe each other's work.</h2>
+      <ul class="plain">
+        <li class="yes" data-ar-html="أنتم غالبًا تعدّلون <strong>مجلدات مختلفة</strong> — شخص في <code>profiles/hyprland/</code>، وآخر في <code>profiles/plasma/</code>.">You mostly edit <strong>different folders</strong> — one person in <code>profiles/hyprland/</code>, another in <code>profiles/plasma/</code>.</li>
+        <li class="yes" data-ar-html="لا شيء يصل إلى <code>main</code> دون طلب سحب يمكنك <strong>رؤيته أولاً</strong>.">Nothing reaches <code>main</code> without a pull request you can <strong>see first</strong>.</li>
+        <li class="yes" data-ar-html="إذا عدّل شخصان نفس الأسطر، <strong>يتوقف git ويسأل إنسانًا</strong>. لا يختار فائزًا بصمت أبدًا.">If two people do edit the same lines, git <strong>stops and asks a human</strong>. It never silently picks a winner.</li>
+        <li class="yes" data-ar="يُحفظ كل تغيير إلى الأبد. يمكن التراجع عن أي خطأ.">Every change is kept forever. Anything wrong can be undone.</li>
+      </ul>
+    </section>
+
+    <!-- 14 -->
+    <section class="slide" data-dur="9500" data-chapter="Working together" data-chapter-ar="العمل معًا">
+      <div class="eyebrow" data-ar="الجزء الثالث · الثغرة الوحيدة">Part three · The one gap</div>
+      <h2 data-ar="الملفات المشتركة تحتاج كلمة أولاً.">Shared files need a word first.</h2>
+      <p class="lede" data-ar-html="بعض الملفات لا تخص شخصًا واحدًا — قائمة الحزم، <code>base/packages/explicit.txt</code>، والمستندات ذات المستوى الأعلى.">Some files don't belong to any one person — the package list, <code>base/packages/explicit.txt</code>, and the top-level documents.</p>
+      <div class="rule"></div>
+      <p class="lede" data-ar-html="قبل أن تلمس أحدها، <strong>قل ذلك</strong>. رسالة واحدة كافية. كل شيء آخر يتولاه النظام نيابة عنك.">Before you touch one, <strong>say so</strong>. A single message is enough. Everything else the system handles for you.</p>
+    </section>
+
+    <!-- 15 -->
+    <section class="slide" data-dur="13000" data-chapter="Recap" data-chapter-ar="الخلاصة">
+      <div class="eyebrow" data-ar="إذا لم تتذكر شيئًا آخر">If you remember nothing else</div>
+      <ol class="steps">
+        <li data-ar="اقبل دعوة المنظمة.">Accept the org invite.</li>
+        <li data-ar="استنسخ المستودع على نظام Arch يعمل.">Clone the repo onto working Arch.</li>
+        <li data-ar="ثبّت قائمة الحزم، وانسخ الإعداد.">Install the package list, copy the config in.</li>
+        <li data-ar-html="فرع ← إيداع ← دفع ← طلب سحب. لا تلمس <code>main</code> أبدًا.">Branch → commit → push → pull request. Never <code>main</code>.</li>
+        <li data-ar="تحدث قبل تعديل الملفات المشتركة.">Speak up before editing shared files.</li>
+      </ol>
+      <p class="note">github.com/YoRHaOS/yorha-os</p>
+    </section>
+
+  </div>
+
+  <div class="prog"><i id="bar"></i></div>
+
+  <div class="chrome bot">
+    <span id="chapterBot">—</span>
+    <span data-ar="← → للتنقل · مسافة للإيقاف المؤقت">← → to move · space to pause</span>
+  </div>
+
+  <div class="ctl">
+    <button id="prev" aria-label="Previous slide" data-ar="السابق">Prev</button>
+    <button id="play" aria-label="Play or pause" data-ar="إيقاف">Pause</button>
+    <button id="next" aria-label="Next slide" data-ar="التالي">Next</button>
+    <span class="count" id="count">01 / 15</span>
+    <button id="restart" aria-label="Restart from first slide" data-ar="إعادة">Restart</button>
+    <button id="langToggle" class="langtoggle" aria-label="Toggle language / تبديل اللغة"><span class="cur">EN</span> / AR</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  const slides   = Array.from(document.querySelectorAll('.slide'));
+  const bar      = document.getElementById('bar');
+  const count    = document.getElementById('count');
+  const chapter  = document.getElementById('chapter');
+  const chapterB = document.getElementById('chapterBot');
+  const playBtn  = document.getElementById('play');
+
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  let i = 0;
+  let playing = !reduced;   // don't auto-run for reduced-motion users
+  let start = 0;
+  let elapsed = 0;
+  let raf = null;
+  let lang = 'en';
+  const playLabel = () => lang === 'ar' ? (playing ? 'إيقاف' : 'تشغيل') : (playing ? 'Pause' : 'Play');
+
+  const pad = n => String(n).padStart(2,'0');
+  const dur = n => parseInt(slides[n].dataset.dur, 10) || 8000;
+
+  function render(){
+    slides.forEach((s,n)=> s.classList.toggle('on', n === i));
+    const ch = lang === 'ar'
+      ? (slides[i].dataset.chapterAr || slides[i].dataset.chapter || '')
+      : (slides[i].dataset.chapter || '');
+    chapter.textContent = ch;
+    chapterB.textContent = ch;
+    count.textContent = pad(i+1) + ' / ' + pad(slides.length);
+  }
+
+  function go(n){
+    i = (n + slides.length) % slides.length;
+    elapsed = 0;
+    start = performance.now();
+    bar.style.width = '0%';
+    render();
+  }
+
+  function tick(now){
+    if(playing){
+      const total = dur(i);
+      const done = elapsed + (now - start);
+      bar.style.width = Math.min(100, (done/total)*100) + '%';
+      if(done >= total){ go(i+1); }
+    }
+    raf = requestAnimationFrame(tick);
+  }
+
+  function setPlaying(v){
+    if(v === playing) return;
+    playing = v;
+    if(playing){ start = performance.now(); }
+    else { elapsed += performance.now() - start; }
+    playBtn.textContent = playLabel();
+  }
+
+  document.getElementById('next').onclick    = () => go(i+1);
+  document.getElementById('prev').onclick    = () => go(i-1);
+  document.getElementById('restart').onclick = () => { go(0); setPlaying(true); };
+  playBtn.onclick = () => setPlaying(!playing);
+
+  document.addEventListener('keydown', e => {
+    if(e.key === 'ArrowRight'){ go(i+1); }
+    else if(e.key === 'ArrowLeft'){ go(i-1); }
+    else if(e.key === ' '){ e.preventDefault(); setPlaying(!playing); }
+  });
+
+  playBtn.textContent = playLabel();
+  go(0);
+  raf = requestAnimationFrame(tick);
+
+  /* -- language toggle -- */
+  const langBtn = document.getElementById('langToggle');
+  const translatable = Array.from(document.querySelectorAll('[data-ar], [data-ar-html]'));
+
+  // stash the original English content the first time, so we can flip back
+  translatable.forEach(el => {
+    if(el.hasAttribute('data-ar-html')){ el.dataset.en = el.innerHTML; }
+    else { el.dataset.en = el.textContent; }
+  });
+
+  function applyLang(next){
+    lang = next;
+    document.documentElement.lang = lang;
+    document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+
+    translatable.forEach(el => {
+      if(el.hasAttribute('data-ar-html')){
+        el.innerHTML = lang === 'ar' ? el.dataset.arHtml : el.dataset.en;
+      } else {
+        el.textContent = lang === 'ar' ? el.dataset.ar : el.dataset.en;
+      }
+    });
+
+    langBtn.innerHTML = lang === 'ar'
+      ? 'EN / <span class="cur">AR</span>'
+      : '<span class="cur">EN</span> / AR';
+
+    playBtn.textContent = playLabel();
+    render(); // refresh chapter label + counter in the right language
+  }
+
+  langBtn.onclick = () => applyLang(lang === 'ar' ? 'en' : 'ar');
+})();
+</script>
+</body>
+</html>
