@@ -2,15 +2,12 @@ import Quickshell
 import QtQuick
 
 ShellRoot {
-    CalendarPanel { id: calendarPanel }
-    PerformancePanel { id: perfPanel }
-    MediaPanel { id: mediaPanel }
+    // One unified control center replaces the old Calendar/Performance/Media
+    // floating panels. Instantiated here with an id and passed into Bar as a
+    // property var ref (no cross-file id references).
     ControlCenter { id: controlCenter }
 
     Bar {
-        calendarPanelRef: calendarPanel
-        perfPanelRef: perfPanel
-        mediaPanelRef: mediaPanel
         controlCenterRef: controlCenter
     }
 }

@@ -12,40 +12,35 @@ PanelWindow {
     implicitHeight: 40
     color: "transparent"
 
-    property color gold: "#FFC968"
-    property color accent: "#F4A144"
-    property color slate: "#1a2226"
+    // Locked LIGHT palette (docs/visual-identity.md) — no wallust dark values.
+    readonly property color cSand:     "#d3cdb6"   // bar fill
+    readonly property color cPanel:    "#dcd7c3"   // capsule fill
+    readonly property color cInk:      "#4a4739"   // primary text
+    readonly property color cInkSoft:  "#6b6754"   // secondary text
+    readonly property color cInkFaint: "#8d8873"   // muted text
+    readonly property color cRule:     "#8d8873"
+    readonly property color cHot:      "#bb5b32"   // accent
+    readonly property color cActiveText:"#d3cdb6"  // label on accent
+    readonly property string mono: "JetBrainsMono Nerd Font"
+
     property int activeWorkspace: 1
 
-    property var calendarPanelRef
-    property var perfPanelRef
-    property var mediaPanelRef
+    // Single unified panel; capsules open it at a specific view.
     property var controlCenterRef
 
-    Rectangle {
-        anchors.fill: parent
-        color: "#010507"
-        opacity: 0.85
-    }
+    Rectangle { anchors.fill: parent; color: bar.cSand }
+    // bottom hairline instead of a heavy edge
+    Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
+                height: 1; color: bar.cRule; opacity: 0.5 }
 
     Process {
         id: activeWsProc
         command: ["hyprctl", "activeworkspace", "-j"]
         stdout: SplitParser {
-            onRead: data => {
-                try {
-                    const parsed = JSON.parse(data)
-                    bar.activeWorkspace = parsed.id
-                } catch (e) {}
-            }
+            onRead: data => { try { bar.activeWorkspace = JSON.parse(data).id } catch (e) {} }
         }
     }
-    Timer {
-        interval: 500
-        running: true
-        repeat: true
-        onTriggered: activeWsProc.running = true
-    }
+    Timer { interval: 500; running: true; repeat: true; onTriggered: activeWsProc.running = true }
 
     RowLayout {
         anchors.fill: parent
@@ -58,10 +53,7 @@ PanelWindow {
             Layout.preferredHeight: 26
             Layout.preferredWidth: wsRow.implicitWidth + 16
             radius: 8
-            color: bar.slate
-            border.color: Qt.rgba(0.96,0.63,0.27,0.25)
-            border.width: 1
-
+            color: bar.cPanel
             Row {
                 id: wsRow
                 anchors.centerIn: parent
@@ -70,14 +62,14 @@ PanelWindow {
                     model: ["壱", "弐", "参", "四", "伍"]
                     delegate: Rectangle {
                         width: 22; height: 20; radius: 6
-                        color: (index + 1) === bar.activeWorkspace ? bar.accent : "transparent"
-                        Behavior on color { ColorAnimation { duration: 150 } }
+                        color: (index + 1) === bar.activeWorkspace ? bar.cHot : "transparent"
+                        Behavior on color { ColorAnimation { duration: 150; easing.type: Easing.OutExpo } }
                         Text {
                             anchors.centerIn: parent
                             text: modelData
-                            color: (index + 1) === bar.activeWorkspace ? "#010507" : Qt.rgba(1,1,1,0.4)
+                            color: (index + 1) === bar.activeWorkspace ? bar.cActiveText : bar.cInkFaint
                             font.pixelSize: 11
-                            font.family: "Noto Sans CJK JP"
+                            font.family: "Noto Sans CJK JP"   // kanji: Nerd Font lacks CJK coverage
                         }
                         MouseArea {
                             anchors.fill: parent
@@ -90,92 +82,68 @@ PanelWindow {
 
         Item { Layout.fillWidth: true }
 
-        // Media capsule (hover expand)
+        // Media capsule → opens control center Home
         Rectangle {
             id: mediaCap
             Layout.preferredHeight: 26
             Layout.preferredWidth: mediaHover.containsMouse ? 150 : 30
-            Behavior on Layout.preferredWidth { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
-            radius: 8
-            color: bar.slate
-            border.color: Qt.rgba(0.96,0.63,0.27,0.25)
-            border.width: 1
-            clip: true
-
+            Behavior on Layout.preferredWidth { NumberAnimation { duration: 160; easing.type: Easing.OutExpo } }
+            radius: 8; color: bar.cPanel; clip: true
             MouseArea {
-                id: mediaHover
-                anchors.fill: parent
-                hoverEnabled: true
-                onClicked: bar.mediaPanelRef.toggle()
+                id: mediaHover; anchors.fill: parent; hoverEnabled: true
+                onClicked: bar.controlCenterRef.openView("home")
             }
-
             Row {
-                anchors.centerIn: parent
-                spacing: 6
-                Text { text: "\uf001"; color: bar.gold; font.pixelSize: 12 }
+                anchors.centerIn: parent; spacing: 6
+                Text { text: ""; color: bar.cInkSoft; font.family: bar.mono; font.pixelSize: 12 }
                 Text {
-                    text: "media"
-                    color: bar.gold
-                    font.pixelSize: 11
-                    width: mediaHover.containsMouse ? implicitWidth : 0
+                    text: "media"; color: bar.cInkSoft; font.family: bar.mono; font.pixelSize: 11
+                    width: mediaHover.containsMouse ? implicitWidth : 0   // animate width with opacity (layout width)
                     clip: true
                     opacity: mediaHover.containsMouse ? 1 : 0
-                    Behavior on width { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+                    Behavior on width { NumberAnimation { duration: 160; easing.type: Easing.OutExpo } }
                     Behavior on opacity { NumberAnimation { duration: 120 } }
                 }
             }
         }
 
-        // Clock capsule (always expanded, center focal point)
+        // Clock capsule (accent focal point) → opens Calendar view
         Rectangle {
             Layout.preferredHeight: 26
             Layout.preferredWidth: clockText.implicitWidth + 24
-            radius: 8
-            color: bar.accent
+            radius: 8; color: bar.cHot
             Text {
                 id: clockText
                 anchors.centerIn: parent
-                color: "#010507"
-                font.pixelSize: 12
-                font.bold: true
-                function updateClock() { text = Qt.formatDateTime(new Date(), "hh:mm  ddd dd MMM") }
+                color: bar.cActiveText
+                font.family: bar.mono; font.pixelSize: 12; font.bold: true
+                function updateClock() { text = Qt.formatDateTime(new Date(), "HH:mm  ddd dd MMM") }
                 Component.onCompleted: updateClock()
                 Timer { interval: 1000; running: true; repeat: true; onTriggered: clockText.updateClock() }
             }
-            MouseArea { anchors.fill: parent; onClicked: bar.calendarPanelRef.toggle() }
+            MouseArea { anchors.fill: parent; onClicked: bar.controlCenterRef.openView("calendar") }
         }
 
-        // Performance capsule (hover expand)
+        // Performance capsule → opens Monitor view
         Rectangle {
             id: perfCap
             Layout.preferredHeight: 26
             Layout.preferredWidth: perfHover.containsMouse ? 130 : 30
-            Behavior on Layout.preferredWidth { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
-            radius: 8
-            color: bar.slate
-            border.color: Qt.rgba(0.96,0.63,0.27,0.25)
-            border.width: 1
-            clip: true
-
+            Behavior on Layout.preferredWidth { NumberAnimation { duration: 160; easing.type: Easing.OutExpo } }
+            radius: 8; color: bar.cPanel; clip: true
             MouseArea {
-                id: perfHover
-                anchors.fill: parent
-                hoverEnabled: true
-                onClicked: bar.perfPanelRef.toggle()
+                id: perfHover; anchors.fill: parent; hoverEnabled: true
+                onClicked: bar.controlCenterRef.openView("monitor")
             }
-
             Row {
-                anchors.centerIn: parent
-                spacing: 6
-                Text { text: "\uf2db"; color: bar.gold; font.pixelSize: 12 }
+                anchors.centerIn: parent; spacing: 6
+                Text { text: ""; color: bar.cInkSoft; font.family: bar.mono; font.pixelSize: 12 }
                 Text {
-                    text: "perf"
-                    color: bar.gold
-                    font.pixelSize: 11
+                    text: "perf"; color: bar.cInkSoft; font.family: bar.mono; font.pixelSize: 11
                     width: perfHover.containsMouse ? implicitWidth : 0
                     clip: true
                     opacity: perfHover.containsMouse ? 1 : 0
-                    Behavior on width { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+                    Behavior on width { NumberAnimation { duration: 160; easing.type: Easing.OutExpo } }
                     Behavior on opacity { NumberAnimation { duration: 120 } }
                 }
             }
@@ -183,35 +151,26 @@ PanelWindow {
 
         Item { Layout.fillWidth: true }
 
-        // Status + control center capsule
+        // Status + control-center capsule → opens Home
         Rectangle {
             Layout.preferredHeight: 26
             Layout.preferredWidth: statusRow.implicitWidth + 20
-            radius: 8
-            color: bar.slate
-            border.color: Qt.rgba(0.96,0.63,0.27,0.25)
-            border.width: 1
-
+            radius: 8; color: bar.cPanel
             Row {
                 id: statusRow
                 anchors.centerIn: parent
                 spacing: 12
-
-                Text { text: "\uf1eb"; color: bar.gold; font.pixelSize: 12 }
-                Text { text: "\uf028"; color: bar.gold; font.pixelSize: 12 }
-                Text { text: "\uf240"; color: bar.gold; font.pixelSize: 12 }
-
+                Text { text: ""; color: bar.cInkSoft; font.family: bar.mono; font.pixelSize: 12 }
+                Text { text: ""; color: bar.cInkSoft; font.family: bar.mono; font.pixelSize: 12 }
+                Text { text: ""; color: bar.cInkSoft; font.family: bar.mono; font.pixelSize: 12 }
                 Rectangle {
                     width: 22; height: 20; radius: 6; color: "transparent"
-                    Text { anchors.centerIn: parent; text: "\uf013"; color: bar.accent; font.pixelSize: 13 }
-                    MouseArea { anchors.fill: parent; onClicked: bar.controlCenterRef.toggle() }
+                    Text { anchors.centerIn: parent; text: ""; color: bar.cHot; font.family: bar.mono; font.pixelSize: 13 }
+                    MouseArea { anchors.fill: parent; onClicked: bar.controlCenterRef.openView("home") }
                 }
             }
         }
     }
 
-    Process {
-        id: wsProc
-        function exec(cmd) { command = cmd; running = true }
-    }
+    Process { id: wsProc; function exec(cmd) { command = cmd; running = true } }
 }
