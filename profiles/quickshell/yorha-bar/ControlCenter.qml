@@ -206,18 +206,33 @@ PanelWindow {
         font.letterSpacing: 2; font.capitalization: Font.AllUppercase
     }
     component Hairline: Rectangle { height: 1; color: root.cRule; opacity: 0.5 }
-    // Borderless: separation from fill contrast (cPanel on cSand) + a soft shadow.
-    // MultiEffect ships with QtQuick (Qt 6.5+, which Quickshell's Qt provides) so
-    // there is no extra import/package to fail on.
-    component Card: Rectangle {
-        radius: 12; color: root.cPanel; antialiasing: true
-        layer.enabled: true
-        layer.effect: MultiEffect {
-            shadowEnabled: true
-            shadowColor: Qt.rgba(0.29,0.28,0.22,0.45)   // soft ink shadow, no colored edge
-            shadowVerticalOffset: 2
-            shadowBlur: 0.5
-            autoPaddingEnabled: true
+    // Borderless: separation from fill contrast (cPanel on cSand) + a soft faux
+    // shadow built from plain QtQuick Rectangles. This deliberately uses NO effects
+    // module (neither QtQuick.Effects/MultiEffect nor Qt5Compat.GraphicalEffects/
+    // DropShadow) so it cannot fail to import on whatever Qt6 the machine actually
+    // has — the shell already relies on Rectangle/Item/anchors everywhere.
+    //
+    // Content declared at each usage becomes a child of this Item and paints on top
+    // of the opaque surface; the two shadow layers sit behind it and peek out.
+    component Card: Item {
+        property real radius: 12
+        Rectangle {                       // outer, softer shadow
+            anchors.fill: parent
+            anchors.topMargin: 5; anchors.bottomMargin: -5
+            anchors.leftMargin: 2; anchors.rightMargin: 2
+            radius: parent.radius + 2; antialiasing: true
+            color: Qt.rgba(0.29,0.28,0.22,0.07)
+        }
+        Rectangle {                       // inner, tighter shadow
+            anchors.fill: parent
+            anchors.topMargin: 3; anchors.bottomMargin: -3
+            radius: parent.radius; antialiasing: true
+            color: Qt.rgba(0.29,0.28,0.22,0.13)
+        }
+        Rectangle {                       // opaque card surface
+            anchors.fill: parent
+            radius: parent.radius; antialiasing: true
+            color: root.cPanel
         }
     }
 
