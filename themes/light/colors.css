@@ -1,0 +1,12 @@
+/* YoRHa OS — Light theme (default). See docs/visual-identity.md.
+   The locked palette. Same eight variable names across every mode. */
+:root{
+  --sand:      #d3cdb6;   /* base background — warm sand / parchment */
+  --sand-deep: #c6bfa4;   /* recessed secondary shade (darker than base) */
+  --panel:     #dcd7c3;   /* framed-panel fill (lighter than base — lifts up) */
+  --ink:       #4a4739;   /* primary text (darkest — most contrast on sand) */
+  --ink-soft:  #6b6754;   /* body text */
+  --ink-faint: #8d8873;   /* labels / muted (lightest text — least contrast) */
+  --rule:      #8d8873;   /* hairlines (== faint) */
+  --hot:       #bb5b32;   /* accent — rust / terracotta */
+}
