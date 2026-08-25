@@ -84,29 +84,14 @@ PanelWindow {
         }
 
 
-        // Media capsule → opens control center Home
+        // Media capsule -> opens control center Home (fixed icon width, no expand)
         Rectangle {
             id: mediaCap
             Layout.preferredHeight: 26
-            Layout.preferredWidth: mediaHover.containsMouse ? 150 : 30
-            Behavior on Layout.preferredWidth { NumberAnimation { duration: 160; easing.type: Easing.OutExpo } }
-            radius: 8; color: bar.cPanel; clip: true
-            MouseArea {
-                id: mediaHover; anchors.fill: parent; hoverEnabled: true
-                onClicked: bar.controlCenterRef.openView("home")
-            }
-            Row {
-                anchors.centerIn: parent; spacing: 6
-                Text { text: "\uf001"; color: bar.cInkSoft; font.family: bar.mono; font.pixelSize: 12 }
-                Text {
-                    text: "media"; color: bar.cInkSoft; font.family: bar.mono; font.pixelSize: 11
-                    width: mediaHover.containsMouse ? implicitWidth : 0   // animate width with opacity (layout width)
-                    clip: true
-                    opacity: mediaHover.containsMouse ? 1 : 0
-                    Behavior on width { NumberAnimation { duration: 160; easing.type: Easing.OutExpo } }
-                    Behavior on opacity { NumberAnimation { duration: 120 } }
-                }
-            }
+            Layout.preferredWidth: 30
+            radius: 8; color: bar.cPanel
+            Text { anchors.centerIn: parent; text: "\uf001"; color: bar.cInkSoft; font.family: bar.mono; font.pixelSize: 12 }
+            MouseArea { anchors.fill: parent; onClicked: bar.controlCenterRef.openView("home") }
         }
 
         // Clock capsule (accent focal point) → opens Calendar view
@@ -126,29 +111,14 @@ PanelWindow {
             MouseArea { anchors.fill: parent; onClicked: bar.controlCenterRef.openView("calendar") }
         }
 
-        // Performance capsule → opens Monitor view
+        // Performance capsule -> opens Monitor view (fixed icon width, no expand)
         Rectangle {
             id: perfCap
             Layout.preferredHeight: 26
-            Layout.preferredWidth: perfHover.containsMouse ? 130 : 30
-            Behavior on Layout.preferredWidth { NumberAnimation { duration: 160; easing.type: Easing.OutExpo } }
-            radius: 8; color: bar.cPanel; clip: true
-            MouseArea {
-                id: perfHover; anchors.fill: parent; hoverEnabled: true
-                onClicked: bar.controlCenterRef.openView("monitor")
-            }
-            Row {
-                anchors.centerIn: parent; spacing: 6
-                Text { text: "\uf2db"; color: bar.cInkSoft; font.family: bar.mono; font.pixelSize: 12 }
-                Text {
-                    text: "perf"; color: bar.cInkSoft; font.family: bar.mono; font.pixelSize: 11
-                    width: perfHover.containsMouse ? implicitWidth : 0
-                    clip: true
-                    opacity: perfHover.containsMouse ? 1 : 0
-                    Behavior on width { NumberAnimation { duration: 160; easing.type: Easing.OutExpo } }
-                    Behavior on opacity { NumberAnimation { duration: 120 } }
-                }
-            }
+            Layout.preferredWidth: 30
+            radius: 8; color: bar.cPanel
+            Text { anchors.centerIn: parent; text: "\uf2db"; color: bar.cInkSoft; font.family: bar.mono; font.pixelSize: 12 }
+            MouseArea { anchors.fill: parent; onClicked: bar.controlCenterRef.openView("monitor") }
         }
 
 
