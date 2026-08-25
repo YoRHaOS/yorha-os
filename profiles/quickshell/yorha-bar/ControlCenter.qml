@@ -101,14 +101,18 @@ PanelWindow {
         stdout: SplitParser { onRead: d => root.osVersion = d.trim() }
     }
 
-    // Media: status | title | artist | artUrl | position | length (tab-separated)
+    // Media: status | title | artist | artUrl | position | length.
+    // playerctl's --format does NOT interpret C escapes like \t, so we use a
+    // literal ASCII separator ("|:|") that playerctl passes through verbatim and
+    // split on the same literal. --player prefers Spotify but falls back to any
+    // active MPRIS player so a bare/first-player mismatch can't hide playback.
     Process {
         id: mediaProc
         command: ["sh","-c",
-            "playerctl metadata --format '{{status}}\\t{{title}}\\t{{artist}}\\t{{mpris:artUrl}}\\t{{duration(position)}}\\t{{duration(mpris:length)}}' 2>/dev/null"]
+            "playerctl --player=spotify,%any metadata --format '{{status}}|:|{{title}}|:|{{artist}}|:|{{mpris:artUrl}}|:|{{duration(position)}}|:|{{duration(mpris:length)}}' 2>/dev/null"]
         stdout: SplitParser {
             onRead: d => {
-                const p = d.replace(/\n$/,"").split("\t")
+                const p = d.replace(/\n$/,"").split("|:|")
                 if (p.length < 3 || (!p[1] && !p[2])) {
                     root.mStatus = ""; root.mTitle = ""; root.mArtist = ""
                     root.mArt = ""; root.mPos = ""; root.mLen = ""
@@ -194,9 +198,10 @@ PanelWindow {
     Process { id: lockCmd;  command: ["hyprlock"] }
     Process { id: logoutCmd;command: ["hyprctl","dispatch","exit"] }
     Process { id: powerCmd; command: ["systemctl","poweroff"] }
-    Process { id: mprev; function go(){ command=["playerctl","previous"]; running=true } }
-    Process { id: mplay; function go(){ command=["playerctl","play-pause"]; running=true } }
-    Process { id: mnext; function go(){ command=["playerctl","next"]; running=true } }
+    // Same --player selection as mediaProc so the buttons control the player shown.
+    Process { id: mprev; function go(){ command=["playerctl","--player=spotify,%any","previous"]; running=true } }
+    Process { id: mplay; function go(){ command=["playerctl","--player=spotify,%any","play-pause"]; running=true } }
+    Process { id: mnext; function go(){ command=["playerctl","--player=spotify,%any","next"]; running=true } }
 
     Timer { interval: 1500; running: root.opened; repeat: true; onTriggered: root.refreshAll() }
 
@@ -205,7 +210,9 @@ PanelWindow {
         color: root.cInkFaint; font.family: root.mono; font.pixelSize: 10
         font.letterSpacing: 2; font.capitalization: Font.AllUppercase
     }
-    component Hairline: Rectangle { height: 1; color: root.cRule; opacity: 0.5 }
+    // implicitHeight (not height) so a Layout reads it as a preferred size rather
+    // than fighting a direct height binding → avoids "recursive rearrange".
+    component Hairline: Rectangle { implicitHeight: 1; color: root.cRule; opacity: 0.5 }
     // Borderless: separation from fill contrast (cPanel on cSand) + a soft faux
     // shadow built from plain QtQuick Rectangles. This deliberately uses NO effects
     // module (neither QtQuick.Effects/MultiEffect nor Qt5Compat.GraphicalEffects/

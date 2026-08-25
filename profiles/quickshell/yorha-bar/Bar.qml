@@ -6,10 +6,14 @@ import QtQuick.Layouts
 
 PanelWindow {
     id: bar
+    // Top-right corner, sized to its content (not full monitor width). Anchoring
+    // to top+right only (no left) lets the layer-surface width follow implicitWidth.
     anchors.top: true
-    anchors.left: true
     anchors.right: true
+    margins.top: 6
+    margins.right: 12
     implicitHeight: 40
+    implicitWidth: barRow.implicitWidth + 32
     color: "transparent"
 
     // Locked LIGHT palette (docs/visual-identity.md) — no wallust dark values.
@@ -28,10 +32,8 @@ PanelWindow {
     // Single unified panel; capsules open it at a specific view.
     property var controlCenterRef
 
-    Rectangle { anchors.fill: parent; color: bar.cSand }
-    // bottom hairline instead of a heavy edge
-    Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
-                height: 1; color: bar.cRule; opacity: 0.5 }
+    // Rounded floating capsule (no longer a full-width edge strip)
+    Rectangle { anchors.fill: parent; radius: 10; color: bar.cSand }
 
     Process {
         id: activeWsProc
@@ -43,6 +45,7 @@ PanelWindow {
     Timer { interval: 500; running: true; repeat: true; onTriggered: activeWsProc.running = true }
 
     RowLayout {
+        id: barRow
         anchors.fill: parent
         anchors.leftMargin: 16
         anchors.rightMargin: 16
@@ -80,7 +83,6 @@ PanelWindow {
             }
         }
 
-        Item { Layout.fillWidth: true }
 
         // Media capsule → opens control center Home
         Rectangle {
@@ -149,7 +151,6 @@ PanelWindow {
             }
         }
 
-        Item { Layout.fillWidth: true }
 
         // Status + control-center capsule → opens Home
         Rectangle {
