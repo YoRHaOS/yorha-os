@@ -234,6 +234,18 @@ PanelWindow {
         root.sinks = sk; root.sources = sr; root.apps = ap
     }
 
+    // Map a PipeWire stream/app name to a Nerd Font glyph for the mixer list.
+    function appIcon(name) {
+        var n = (name || "").toLowerCase()
+        if (n.indexOf("spotify") >= 0) return "\uf1bc"
+        if (n.indexOf("firefox") >= 0 || n.indexOf("zen") >= 0) return "\uf269"
+        if (n.indexOf("chrom") >= 0) return "\uf268"
+        if (n.indexOf("discord") >= 0) return "\uf392"
+        if (n.indexOf("vlc") >= 0 || n.indexOf("mpv") >= 0 || n.indexOf("video") >= 0) return "\uf03d"
+        if (n.indexOf("webrtc") >= 0 || n.indexOf("voice") >= 0) return "\uf130"
+        return "\uf001"
+    }
+
     Timer { interval: 1500; running: root.opened; repeat: true; onTriggered: root.refreshAll() }
 
     // ===================== reusable inline components ====================
@@ -625,6 +637,7 @@ PanelWindow {
                                     onMoved: wpVol.run(["set-volume", "@DEFAULT_AUDIO_SINK@", value.toFixed(2)])
                                     Connections { target: root; function onDefSinkChanged(){ if (!masterVol.pressed && root.defSink) masterVol.value = root.defSink.vol } }
                                 }
+                                Text { text: Math.round(masterVol.value*100) + "%"; color: masterVol.pressed ? root.cHot : root.cInkFaint; font.family: root.mono; font.pixelSize: 10 }
                             }
                             RowLayout {
                                 Layout.fillWidth: true; spacing: 12
@@ -636,6 +649,7 @@ PanelWindow {
                                     onMoved: wpVol.run(["set-volume", "@DEFAULT_AUDIO_SOURCE@", value.toFixed(2)])
                                     Connections { target: root; function onDefSourceChanged(){ if (!masterMic.pressed && root.defSource) masterMic.value = root.defSource.vol } }
                                 }
+                                Text { text: Math.round(masterMic.value*100) + "%"; color: masterMic.pressed ? root.cHot : root.cInkFaint; font.family: root.mono; font.pixelSize: 10 }
                             }
 
                             Hairline { Layout.fillWidth: true }
@@ -663,8 +677,12 @@ PanelWindow {
                                             }
                                             ColumnLayout {
                                                 Layout.fillWidth: true; spacing: 1
-                                                Text { Layout.fillWidth: true; text: modelData.name; elide: Text.ElideRight; color: modelData.def ? root.cInk : root.cInkSoft; font.family: root.mono; font.pixelSize: 11 }
-                                                Slider { Layout.fillWidth: true; from: 0; to: 1.5; Component.onCompleted: value = modelData.vol; onMoved: wpVol.run(["set-volume", modelData.id, value.toFixed(2)]) }
+                                                RowLayout {
+                                                    Layout.fillWidth: true; spacing: 6
+                                                    Text { Layout.fillWidth: true; text: modelData.name; elide: Text.ElideRight; color: modelData.def ? root.cInk : root.cInkSoft; font.family: root.mono; font.pixelSize: 11 }
+                                                    Text { text: Math.round(sinkSld.value*100) + "%"; color: sinkSld.pressed ? root.cHot : root.cInkFaint; font.family: root.mono; font.pixelSize: 10 }
+                                                }
+                                                Slider { id: sinkSld; Layout.fillWidth: true; from: 0; to: 1.5; Component.onCompleted: value = modelData.vol; onMoved: wpVol.run(["set-volume", modelData.id, value.toFixed(2)]) }
                                             }
                                         }
                                     }
@@ -682,8 +700,12 @@ PanelWindow {
                                             }
                                             ColumnLayout {
                                                 Layout.fillWidth: true; spacing: 1
-                                                Text { Layout.fillWidth: true; text: modelData.name; elide: Text.ElideRight; color: modelData.def ? root.cInk : root.cInkSoft; font.family: root.mono; font.pixelSize: 11 }
-                                                Slider { Layout.fillWidth: true; from: 0; to: 1.5; Component.onCompleted: value = modelData.vol; onMoved: wpVol.run(["set-volume", modelData.id, value.toFixed(2)]) }
+                                                RowLayout {
+                                                    Layout.fillWidth: true; spacing: 6
+                                                    Text { Layout.fillWidth: true; text: modelData.name; elide: Text.ElideRight; color: modelData.def ? root.cInk : root.cInkSoft; font.family: root.mono; font.pixelSize: 11 }
+                                                    Text { text: Math.round(srcSld.value*100) + "%"; color: srcSld.pressed ? root.cHot : root.cInkFaint; font.family: root.mono; font.pixelSize: 10 }
+                                                }
+                                                Slider { id: srcSld; Layout.fillWidth: true; from: 0; to: 1.5; Component.onCompleted: value = modelData.vol; onMoved: wpVol.run(["set-volume", modelData.id, value.toFixed(2)]) }
                                             }
                                         }
                                     }
@@ -696,8 +718,13 @@ PanelWindow {
                                             Layout.fillWidth: true; spacing: 8
                                             ColumnLayout {
                                                 Layout.fillWidth: true; spacing: 1
-                                                Text { Layout.fillWidth: true; text: modelData.name; elide: Text.ElideRight; color: root.cInkSoft; font.family: root.mono; font.pixelSize: 11 }
-                                                Slider { Layout.fillWidth: true; from: 0; to: 1.5; Component.onCompleted: value = modelData.vol; onMoved: wpVol.run(["set-volume", modelData.id, value.toFixed(2)]) }
+                                                RowLayout {
+                                                    Layout.fillWidth: true; spacing: 6
+                                                    Text { text: root.appIcon(modelData.name); color: root.cInkSoft; font.family: root.mono; font.pixelSize: 12 }
+                                                    Text { Layout.fillWidth: true; text: modelData.name; elide: Text.ElideRight; color: root.cInkSoft; font.family: root.mono; font.pixelSize: 11 }
+                                                    Text { text: Math.round(appSld.value*100) + "%"; color: appSld.pressed ? root.cHot : root.cInkFaint; font.family: root.mono; font.pixelSize: 10 }
+                                                }
+                                                Slider { id: appSld; Layout.fillWidth: true; from: 0; to: 1.5; Component.onCompleted: value = modelData.vol; onMoved: wpVol.run(["set-volume", modelData.id, value.toFixed(2)]) }
                                             }
                                         }
                                     }
