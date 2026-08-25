@@ -72,6 +72,15 @@ PanelWindow {
     property string mPos: ""
     property string mLen: ""
 
+    // ---- audio (PipeWire via wpctl, parsed by audio-status.sh) -----------
+    property var sinks: []           // [{id, def, vol, name}] output devices
+    property var sources: []         // input devices
+    property var apps: []            // per-application playback streams
+    property string _audioSig: ""    // change-guard so idle polls don't churn delegates
+    readonly property string audioScript: Qt.resolvedUrl("audio-status.sh").toString().replace(/^file:\/\//, "")
+    readonly property var defSink:   { var r = null; for (var i = 0; i < sinks.length;   i++) if (sinks[i].def)   r = sinks[i];   return r }
+    readonly property var defSource: { var r = null; for (var i = 0; i < sources.length; i++) if (sources[i].def) r = sources[i]; return r }
+
     // ---- profile state ---------------------------------------------------
     property string userName: ""
     property string hostName: ""
@@ -83,6 +92,7 @@ PanelWindow {
         uptimeProc.running = true; versionProc.running = true
         mediaProc.running = true; statProc.running = true
         tempProc.running = true; memProc.running = true; netProc.running = true
+        audioProc.running = true
     }
 
     Behavior on implicitHeight { NumberAnimation { duration: 260; easing.type: Easing.OutExpo } }
@@ -191,10 +201,6 @@ PanelWindow {
     }
 
     // Action processes
-    Process { id: volUp;    command: ["wpctl","set-volume","@DEFAULT_AUDIO_SINK@","5%+"] }
-    Process { id: volDown;  command: ["wpctl","set-volume","@DEFAULT_AUDIO_SINK@","5%-"] }
-    Process { id: briUp;    command: ["brightnessctl","set","5%+"] }
-    Process { id: briDown;  command: ["brightnessctl","set","5%-"] }
     Process { id: lockCmd;  command: ["hyprlock"] }
     Process { id: logoutCmd;command: ["hyprctl","dispatch","exit"] }
     Process { id: powerCmd; command: ["systemctl","poweroff"] }
@@ -202,6 +208,31 @@ PanelWindow {
     Process { id: mprev; function go(){ command=["playerctl","--player=spotify,%any","previous"]; running=true } }
     Process { id: mplay; function go(){ command=["playerctl","--player=spotify,%any","play-pause"]; running=true } }
     Process { id: mnext; function go(){ command=["playerctl","--player=spotify,%any","next"]; running=true } }
+
+    // Audio model + control. wpVol/wpDef are separate reusable Processes so a rapid
+    // slider drag (set-volume) can't clobber a set-default click.
+    Process {
+        id: audioProc; command: ["sh", root.audioScript]
+        stdout: StdioCollector { onStreamFinished: root.parseAudio(text) }
+    }
+    Process { id: wpVol; function run(a){ command = ["wpctl"].concat(a); running = true } }
+    Process { id: wpDef; function run(a){ command = ["wpctl"].concat(a); running = true } }
+    function parseAudio(text) {
+        const sk = [], sr = [], ap = []
+        for (const line of text.split("\n")) {
+            if (!line) continue
+            const f = line.split("\t")
+            if (f.length < 5) continue
+            const o = { id: f[1], def: f[2] === "1", vol: parseFloat(f[3]) || 0, name: f[4] }
+            if (f[0] === "SINK") sk.push(o)
+            else if (f[0] === "SOURCE") sr.push(o)
+            else if (f[0] === "APP") ap.push(o)
+        }
+        const sig = JSON.stringify([sk, sr, ap])
+        if (sig === root._audioSig) return          // unchanged → keep delegates (stable sliders)
+        root._audioSig = sig
+        root.sinks = sk; root.sources = sr; root.apps = ap
+    }
 
     Timer { interval: 1500; running: root.opened; repeat: true; onTriggered: root.refreshAll() }
 
@@ -576,24 +607,102 @@ PanelWindow {
 
                         // ---- AUDIO ----
                         ColumnLayout {
-                            anchors.fill: parent; spacing: 16
+                            anchors.fill: parent; spacing: 10
                             opacity: root.view === "audio" ? 1 : 0
                             visible: opacity > 0.01
                             Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutExpo } }
+
                             Eyebrow { text: "Audio" }
+
+                            // master quick access — tracks the default sink / default source
                             RowLayout {
                                 Layout.fillWidth: true; spacing: 12
                                 Text { text: "\uf028"; font.family: root.mono; font.pixelSize: 14; color: root.cInkSoft }
-                                Slider { Layout.fillWidth: true; from:0; to:100; value:50
-                                         onMoved: value > 50 ? (volUp.running=true) : (volDown.running=true) }
+                                Slider {
+                                    id: masterVol
+                                    Layout.fillWidth: true; from: 0; to: 1.5
+                                    Component.onCompleted: value = root.defSink ? root.defSink.vol : 1
+                                    onMoved: wpVol.run(["set-volume", "@DEFAULT_AUDIO_SINK@", value.toFixed(2)])
+                                    Connections { target: root; function onDefSinkChanged(){ if (!masterVol.pressed && root.defSink) masterVol.value = root.defSink.vol } }
+                                }
                             }
                             RowLayout {
                                 Layout.fillWidth: true; spacing: 12
-                                Text { text: "\uf185"; font.family: root.mono; font.pixelSize: 14; color: root.cInkSoft }
-                                Slider { Layout.fillWidth: true; from:0; to:100; value:70
-                                         onMoved: value > 70 ? (briUp.running=true) : (briDown.running=true) }
+                                Text { text: "\uf130"; font.family: root.mono; font.pixelSize: 14; color: root.cInkSoft }
+                                Slider {
+                                    id: masterMic
+                                    Layout.fillWidth: true; from: 0; to: 1.5
+                                    Component.onCompleted: value = root.defSource ? root.defSource.vol : 1
+                                    onMoved: wpVol.run(["set-volume", "@DEFAULT_AUDIO_SOURCE@", value.toFixed(2)])
+                                    Connections { target: root; function onDefSourceChanged(){ if (!masterMic.pressed && root.defSource) masterMic.value = root.defSource.vol } }
+                                }
                             }
-                            Item { Layout.fillHeight: true }
+
+                            Hairline { Layout.fillWidth: true }
+
+                            // per-device + per-app mixer (scrolls when it overflows)
+                            Flickable {
+                                Layout.fillWidth: true; Layout.fillHeight: true
+                                contentWidth: width; contentHeight: mixCol.implicitHeight
+                                clip: true; boundsBehavior: Flickable.StopAtBounds
+                                ColumnLayout {
+                                    id: mixCol
+                                    width: parent.width
+                                    spacing: 10
+
+                                    Eyebrow { text: "Output Devices" }
+                                    Repeater {
+                                        model: root.sinks
+                                        delegate: RowLayout {
+                                            Layout.fillWidth: true; spacing: 8
+                                            Rectangle {
+                                                Layout.preferredWidth: 12; Layout.preferredHeight: 12; radius: 6
+                                                color: modelData.def ? root.cHot : "transparent"
+                                                border.color: root.cRule; border.width: modelData.def ? 0 : 1
+                                                MouseArea { anchors.fill: parent; anchors.margins: -6; onClicked: wpDef.run(["set-default", modelData.id]) }
+                                            }
+                                            ColumnLayout {
+                                                Layout.fillWidth: true; spacing: 1
+                                                Text { Layout.fillWidth: true; text: modelData.name; elide: Text.ElideRight; color: modelData.def ? root.cInk : root.cInkSoft; font.family: root.mono; font.pixelSize: 11 }
+                                                Slider { Layout.fillWidth: true; from: 0; to: 1.5; Component.onCompleted: value = modelData.vol; onMoved: wpVol.run(["set-volume", modelData.id, value.toFixed(2)]) }
+                                            }
+                                        }
+                                    }
+
+                                    Eyebrow { text: "Input Devices" }
+                                    Repeater {
+                                        model: root.sources
+                                        delegate: RowLayout {
+                                            Layout.fillWidth: true; spacing: 8
+                                            Rectangle {
+                                                Layout.preferredWidth: 12; Layout.preferredHeight: 12; radius: 6
+                                                color: modelData.def ? root.cHot : "transparent"
+                                                border.color: root.cRule; border.width: modelData.def ? 0 : 1
+                                                MouseArea { anchors.fill: parent; anchors.margins: -6; onClicked: wpDef.run(["set-default", modelData.id]) }
+                                            }
+                                            ColumnLayout {
+                                                Layout.fillWidth: true; spacing: 1
+                                                Text { Layout.fillWidth: true; text: modelData.name; elide: Text.ElideRight; color: modelData.def ? root.cInk : root.cInkSoft; font.family: root.mono; font.pixelSize: 11 }
+                                                Slider { Layout.fillWidth: true; from: 0; to: 1.5; Component.onCompleted: value = modelData.vol; onMoved: wpVol.run(["set-volume", modelData.id, value.toFixed(2)]) }
+                                            }
+                                        }
+                                    }
+
+                                    Eyebrow { text: "Applications" }
+                                    Text { visible: root.apps.length === 0; text: "nothing playing"; color: root.cInkFaint; font.family: root.mono; font.pixelSize: 11 }
+                                    Repeater {
+                                        model: root.apps
+                                        delegate: RowLayout {
+                                            Layout.fillWidth: true; spacing: 8
+                                            ColumnLayout {
+                                                Layout.fillWidth: true; spacing: 1
+                                                Text { Layout.fillWidth: true; text: modelData.name; elide: Text.ElideRight; color: root.cInkSoft; font.family: root.mono; font.pixelSize: 11 }
+                                                Slider { Layout.fillWidth: true; from: 0; to: 1.5; Component.onCompleted: value = modelData.vol; onMoved: wpVol.run(["set-volume", modelData.id, value.toFixed(2)]) }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
 
                         // ---- CALENDAR ----
