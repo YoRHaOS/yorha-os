@@ -88,6 +88,12 @@ PanelWindow {
     property string _wifiSig: ""
     readonly property string wifiScript: Qt.resolvedUrl("wifi-status.sh").toString().replace(/^file:\/\//, "")
 
+    // ---- bluetooth (bluetoothctl via bt-status.sh) -----------------------
+    property bool btPower: false
+    property var btDevices: []       // [{mac, paired, connected, name}]
+    property string _btSig: ""
+    readonly property string btScript: Qt.resolvedUrl("bt-status.sh").toString().replace(/^file:\/\//, "")
+
     // ---- profile state ---------------------------------------------------
     property string userName: ""
     property string hostName: ""
@@ -278,6 +284,34 @@ PanelWindow {
         if (net.inuse) return
         if (net.security === "" || root.savedSsids[net.ssid]) { wifiConn.run(["device","wifi","connect", net.ssid]); root.wifiExpanded = "" }
         else root.wifiExpanded = (root.wifiExpanded === net.ssid) ? "" : net.ssid
+    }
+
+    // Bluetooth model + control.
+    Process { id: btProc; command: ["sh", root.btScript]
+        stdout: StdioCollector { onStreamFinished: root.parseBt(text) } }
+    Process { id: btCtl; function run(a){ command = ["bluetoothctl"].concat(a); running = true } }
+    Process { id: btPairConn; function run(mac){ command = ["sh","-c","bluetoothctl pair '" + mac + "' ; bluetoothctl connect '" + mac + "'"]; running = true } }
+    Timer { id: btFollow;     interval: 1500; repeat: false; onTriggered: btProc.running = true }
+    Timer { id: btScanFollow; interval: 9000; repeat: false; onTriggered: btProc.running = true }
+    Timer { interval: 4000; running: root.opened && root.view === "bluetooth"; repeat: true; triggeredOnStart: true; onTriggered: btProc.running = true }
+    function parseBt(text) {
+        const devs = []; let power = false
+        for (const line of text.split("\n")) {
+            if (!line) continue
+            const f = line.split("\t")
+            if (f[0] === "POWER") power = f[1] === "1"
+            else if (f[0] === "DEV" && f.length >= 5) devs.push({ mac: f[1], paired: f[2] === "1", connected: f[3] === "1", name: f[4] })
+        }
+        devs.sort((a, b) => (b.connected ? 1 : 0) - (a.connected ? 1 : 0) || (b.paired ? 1 : 0) - (a.paired ? 1 : 0))
+        const sig = JSON.stringify([power, devs])
+        if (sig === root._btSig) return
+        root._btSig = sig; root.btPower = power; root.btDevices = devs
+    }
+    function btClick(d) {
+        if (d.connected) btCtl.run(["disconnect", d.mac])
+        else if (d.paired) btCtl.run(["connect", d.mac])
+        else btPairConn.run(d.mac)
+        btFollow.restart()
     }
     Timer { interval: 1500; running: root.opened; repeat: true; onTriggered: root.refreshAll() }
 
@@ -839,10 +873,61 @@ PanelWindow {
                             }
                         }
 
+                        // ---- BLUETOOTH ----
+                        ColumnLayout {
+                            anchors.fill: parent; spacing: 10
+                            opacity: root.view === "bluetooth" ? 1 : 0
+                            visible: opacity > 0.01
+                            Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutExpo } }
+
+                            RowLayout {
+                                Layout.fillWidth: true; spacing: 8
+                                Eyebrow { Layout.fillWidth: true; text: "Bluetooth" }
+                                Rectangle {
+                                    Layout.preferredWidth: 46; Layout.preferredHeight: 20; radius: 10
+                                    color: root.btPower ? root.cHot : "transparent"
+                                    border.color: root.cRule; border.width: root.btPower ? 0 : 1
+                                    Behavior on color { ColorAnimation { duration: 180 } }
+                                    Text { anchors.centerIn: parent; text: root.btPower ? "ON" : "OFF"; font.family: root.mono; font.pixelSize: 9; color: root.btPower ? root.cActiveText : root.cInkFaint }
+                                    MouseArea { anchors.fill: parent; onClicked: { btCtl.run(["power", root.btPower ? "off" : "on"]); btFollow.restart() } }
+                                }
+                                Text { text: "\uf021"; font.family: root.mono; font.pixelSize: 12; color: btScanMa.containsMouse ? root.cHot : root.cInkFaint
+                                       MouseArea { id: btScanMa; anchors.fill: parent; anchors.margins: -6; hoverEnabled: true; onClicked: { btCtl.run(["--timeout","8","scan","on"]); btScanFollow.restart() } } }
+                            }
+                            Hairline { Layout.fillWidth: true }
+
+                            Flickable {
+                                Layout.fillWidth: true; Layout.fillHeight: true
+                                contentWidth: width; contentHeight: btCol.implicitHeight
+                                clip: true; boundsBehavior: Flickable.StopAtBounds
+                                ColumnLayout {
+                                    id: btCol
+                                    width: parent.width; spacing: 6
+                                    Text { visible: !root.btPower; text: "bluetooth off"; color: root.cInkFaint; font.family: root.mono; font.pixelSize: 11 }
+                                    Text { visible: root.btPower && root.btDevices.length === 0; text: "no devices — press scan"; color: root.cInkFaint; font.family: root.mono; font.pixelSize: 11 }
+                                    Repeater {
+                                        model: root.btDevices
+                                        delegate: Item {
+                                            Layout.fillWidth: true; Layout.preferredHeight: 32
+                                            RowLayout {
+                                                anchors.fill: parent; spacing: 8
+                                                Text { text: "\uf294"; font.family: root.mono; font.pixelSize: 13; color: modelData.connected ? root.cHot : root.cInkSoft }
+                                                ColumnLayout {
+                                                    Layout.fillWidth: true; spacing: 0
+                                                    Text { Layout.fillWidth: true; text: modelData.name; elide: Text.ElideRight; color: modelData.connected ? root.cInk : root.cInkSoft; font.family: root.mono; font.pixelSize: 12; font.bold: modelData.connected }
+                                                    Text { visible: modelData.connected || modelData.paired; text: modelData.connected ? "connected" : "paired"; color: root.cInkFaint; font.family: root.mono; font.pixelSize: 9 }
+                                                }
+                                            }
+                                            MouseArea { anchors.fill: parent; onClicked: root.btClick(modelData) }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         // ---- NETWORK / BLUETOOTH / NOTIFY (minimal real views) ----
                         Repeater {
                             model: [
-                                { v:"bluetooth", l:"Bluetooth",     note:"Bluetooth " + (root.btOn ? "on" : "off") },
                                 { v:"notify",    l:"Notifications", note:"No notifications" }
                             ]
                             delegate: ColumnLayout {
