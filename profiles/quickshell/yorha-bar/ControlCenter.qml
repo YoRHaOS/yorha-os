@@ -32,6 +32,7 @@ PanelWindow {
     property string view: "home"                 // active rail view
     function toggle() { opened = !opened; if (opened) refreshAll() }
     function openView(v) { view = v; if (!opened) { opened = true; refreshAll() } }
+    onViewChanged: if (view === "settings") settingsProc.running = true
 
     // ---- locked light palette (docs/visual-identity.md) ------------------
     readonly property color cSand:      "#d3cdb6"   // panel base
@@ -103,6 +104,13 @@ PanelWindow {
     property var btDevices: []       // [{mac, paired, connected, name}]
     property string _btSig: ""
     readonly property string btScript: Qt.resolvedUrl("bt-status.sh").toString().replace(/^file:\/\//, "")
+
+    // ---- settings (panel.conf via yorha-settings.sh) --------------------
+    property var settings: ({})      // KEY -> value
+    readonly property string settingsScript: Qt.resolvedUrl("yorha-settings.sh").toString().replace(/^file:\/\//, "")
+    readonly property var autostartItems: ["waybar", "dunst", "hypridle", "hyprpaper"]
+    function autostartOn(name) { return root.settings["AUTOSTART_" + name] !== "0" }   // default on
+    function setKV(k, v) { settingsSet.set(k, v); var m = Object.assign({}, root.settings); m[k] = v; root.settings = m }
 
     // ---- profile state ---------------------------------------------------
     property string userName: ""
@@ -363,6 +371,18 @@ PanelWindow {
         else btPairConn.run(d.mac)
         btFollow.restart()
     }
+
+    // Settings store + theme switcher (reuses PR #9 scripts/set-theme.sh; theme
+    // logic is NOT reimplemented here).
+    Process { id: settingsProc; command: ["sh", root.settingsScript, "dump"]
+        stdout: StdioCollector { onStreamFinished: root.parseSettings(text) } }
+    Process { id: settingsSet; function set(k, v){ command = ["sh", root.settingsScript, "set", k, v]; running = true } }
+    Process { id: themeCmd; function apply(mode){ command = ["sh","-c","\"${YORHA_REPO:-$HOME/yorha-os}/scripts/set-theme.sh\" " + mode]; running = true } }
+    function parseSettings(text) {
+        const m = {}
+        for (const line of text.split("\n")) { const i = line.indexOf("="); if (i > 0) m[line.slice(0, i)] = line.slice(i + 1) }
+        root.settings = m
+    }
     Timer { interval: 1500; running: root.opened; repeat: true; onTriggered: root.refreshAll() }
 
     // ===================== reusable inline components ====================
@@ -524,7 +544,7 @@ PanelWindow {
                                     onClicked: {
                                         if (modelData.act === "close") root.opened = false
                                         else if (modelData.act === "power") powerCmd.running = true
-                                        // "settings" reserved
+                                        else if (modelData.act === "settings") { root.view = "settings"; settingsProc.running = true }
                                     }
                                 }
                             }
@@ -969,6 +989,68 @@ PanelWindow {
                                     }
                                 }
                             }
+                        }
+
+                        // ---- SETTINGS ----
+                        ColumnLayout {
+                            anchors.fill: parent; spacing: 12
+                            opacity: root.view === "settings" ? 1 : 0
+                            visible: opacity > 0.01
+                            Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutExpo } }
+
+                            Eyebrow { text: "Theme" }
+                            RowLayout {
+                                Layout.fillWidth: true; spacing: 8
+                                Repeater {
+                                    model: [{ m: "light", l: "Light" }, { m: "dark", l: "Dark" }]
+                                    delegate: Rectangle {
+                                        Layout.fillWidth: true; Layout.preferredHeight: 30; radius: 8
+                                        color: "transparent"; border.color: root.cRule; border.width: 1
+                                        Text { anchors.centerIn: parent; text: modelData.l; font.family: root.mono; font.pixelSize: 11; color: root.cInkSoft }
+                                        MouseArea { anchors.fill: parent; onClicked: themeCmd.apply(modelData.m) }
+                                    }
+                                }
+                            }
+
+                            Hairline { Layout.fillWidth: true }
+
+                            Eyebrow { text: "Autostart" }
+                            Repeater {
+                                model: root.autostartItems
+                                delegate: RowLayout {
+                                    Layout.fillWidth: true; spacing: 8
+                                    Text { Layout.fillWidth: true; text: modelData; color: root.cInkSoft; font.family: root.mono; font.pixelSize: 12 }
+                                    Rectangle {
+                                        Layout.preferredWidth: 46; Layout.preferredHeight: 20; radius: 10
+                                        property bool on: root.autostartOn(modelData)
+                                        color: on ? root.cHot : "transparent"; border.color: root.cRule; border.width: on ? 0 : 1
+                                        Behavior on color { ColorAnimation { duration: 160 } }
+                                        Text { anchors.centerIn: parent; text: parent.on ? "ON" : "OFF"; font.family: root.mono; font.pixelSize: 9; color: parent.on ? root.cActiveText : root.cInkFaint }
+                                        MouseArea { anchors.fill: parent; onClicked: root.setKV("AUTOSTART_" + modelData, root.autostartOn(modelData) ? "0" : "1") }
+                                    }
+                                }
+                            }
+                            Text { text: "honored by yorha-autostart.sh (add it as one exec-once)"; color: root.cInkFaint; font.family: root.mono; font.pixelSize: 9 }
+
+                            Hairline { Layout.fillWidth: true }
+
+                            Eyebrow { text: "Bar Position" }
+                            RowLayout {
+                                Layout.fillWidth: true; spacing: 8
+                                Repeater {
+                                    model: [{ v: "left", l: "Left" }, { v: "right", l: "Right" }]
+                                    delegate: Rectangle {
+                                        Layout.fillWidth: true; Layout.preferredHeight: 30; radius: 8
+                                        property bool sel: (root.settings["BAR_POS"] || "right") === modelData.v
+                                        color: sel ? root.cHot : "transparent"; border.color: root.cRule; border.width: sel ? 0 : 1
+                                        Text { anchors.centerIn: parent; text: modelData.l; font.family: root.mono; font.pixelSize: 11; color: parent.sel ? root.cActiveText : root.cInkSoft }
+                                        MouseArea { anchors.fill: parent; onClicked: root.setKV("BAR_POS", modelData.v) }
+                                    }
+                                }
+                            }
+                            Text { text: "bar position applies on next restart"; color: root.cInkFaint; font.family: root.mono; font.pixelSize: 9 }
+
+                            Item { Layout.fillHeight: true }
                         }
 
                         // ---- NETWORK / BLUETOOTH / NOTIFY (minimal real views) ----

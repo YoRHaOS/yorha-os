@@ -6,15 +6,26 @@ import QtQuick.Layouts
 
 PanelWindow {
     id: bar
-    // Top-right corner, sized to its content (not full monitor width). Anchoring
-    // to top+right only (no left) lets the layer-surface width follow implicitWidth.
+    // Top corner, sized to its content (not full monitor width). Side is set from
+    // the Settings view (BAR_POS in panel.conf), read once at startup; default right.
+    property string barPos: "right"
     anchors.top: true
-    anchors.right: true
+    anchors.right: bar.barPos !== "left"
+    anchors.left: bar.barPos === "left"
     margins.top: 6
     margins.right: 12
+    margins.left: 12
     implicitHeight: 40
     implicitWidth: barRow.implicitWidth + 32
     color: "transparent"
+
+    // Bar position preference (Settings view writes it; applied on next start).
+    Process {
+        id: posProc
+        command: ["sh","-c","awk -F= '/^BAR_POS=/{v=$2} END{print v}' \"${XDG_CONFIG_HOME:-$HOME/.config}/yorha/panel.conf\" 2>/dev/null"]
+        stdout: SplitParser { onRead: d => { const v = d.trim(); if (v) bar.barPos = v } }
+    }
+    Component.onCompleted: posProc.running = true
 
     // Locked LIGHT palette (docs/visual-identity.md) — no wallust dark values.
     readonly property color cSand:     "#d3cdb6"   // bar fill
