@@ -81,6 +81,13 @@ PanelWindow {
     readonly property var defSink:   { var r = null; for (var i = 0; i < sinks.length;   i++) if (sinks[i].def)   r = sinks[i];   return r }
     readonly property var defSource: { var r = null; for (var i = 0; i < sources.length; i++) if (sources[i].def) r = sources[i]; return r }
 
+    // ---- wifi (nmcli via wifi-status.sh) ---------------------------------
+    property var networks: []        // [{inuse, signal, security, ssid}]
+    property var savedSsids: ({})    // ssid -> true (known profiles)
+    property string wifiExpanded: "" // ssid whose inline password field is open
+    property string _wifiSig: ""
+    readonly property string wifiScript: Qt.resolvedUrl("wifi-status.sh").toString().replace(/^file:\/\//, "")
+
     // ---- profile state ---------------------------------------------------
     property string userName: ""
     property string hostName: ""
@@ -246,6 +253,32 @@ PanelWindow {
         return "\uf001"
     }
 
+
+    // Wifi model + control. wifiConn is reusable for connect/password submit.
+    Process { id: wifiProc; command: ["sh", root.wifiScript]
+        stdout: StdioCollector { onStreamFinished: root.parseWifi(text) } }
+    Process { id: wifiConn; function run(a){ command = ["nmcli"].concat(a); running = true } }
+    Process { id: wifiRescan; command: ["nmcli","device","wifi","rescan"] }
+    Timer { id: wifiFollow; interval: 2000; repeat: false; onTriggered: wifiProc.running = true }
+    Timer { interval: 6000; running: root.opened && root.view === "network"; repeat: true; triggeredOnStart: true; onTriggered: wifiProc.running = true }
+    function parseWifi(text) {
+        const nets = [], saved = {}
+        for (const line of text.split("\n")) {
+            if (!line) continue
+            const f = line.split("\t")
+            if (f[0] === "NET" && f.length >= 5) nets.push({ inuse: f[1] === "1", signal: parseInt(f[2]) || 0, security: f[3], ssid: f[4] })
+            else if (f[0] === "SAVED" && f.length >= 2) saved[f[1]] = true
+        }
+        nets.sort((a, b) => (b.inuse ? 1 : 0) - (a.inuse ? 1 : 0) || b.signal - a.signal)
+        const sig = JSON.stringify([nets, saved])
+        if (sig === root._wifiSig) return
+        root._wifiSig = sig; root.networks = nets; root.savedSsids = saved
+    }
+    function wifiClick(net) {
+        if (net.inuse) return
+        if (net.security === "" || root.savedSsids[net.ssid]) { wifiConn.run(["device","wifi","connect", net.ssid]); root.wifiExpanded = "" }
+        else root.wifiExpanded = (root.wifiExpanded === net.ssid) ? "" : net.ssid
+    }
     Timer { interval: 1500; running: root.opened; repeat: true; onTriggered: root.refreshAll() }
 
     // ===================== reusable inline components ====================
@@ -747,10 +780,68 @@ PanelWindow {
                             Item { Layout.fillHeight: true }
                         }
 
+                        // ---- NETWORK (WiFi) ----
+                        ColumnLayout {
+                            anchors.fill: parent; spacing: 10
+                            opacity: root.view === "network" ? 1 : 0
+                            visible: opacity > 0.01
+                            Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutExpo } }
+
+                            RowLayout {
+                                Layout.fillWidth: true; spacing: 8
+                                Eyebrow { Layout.fillWidth: true; text: "Networks" }
+                                Text { text: "\uf021"; font.family: root.mono; font.pixelSize: 12; color: rescanMa.containsMouse ? root.cHot : root.cInkFaint
+                                       MouseArea { id: rescanMa; anchors.fill: parent; anchors.margins: -6; hoverEnabled: true; onClicked: { wifiRescan.running = true; wifiFollow.restart() } } }
+                            }
+                            Hairline { Layout.fillWidth: true }
+
+                            Flickable {
+                                Layout.fillWidth: true; Layout.fillHeight: true
+                                contentWidth: width; contentHeight: netCol.implicitHeight
+                                clip: true; boundsBehavior: Flickable.StopAtBounds
+                                ColumnLayout {
+                                    id: netCol
+                                    width: parent.width; spacing: 6
+                                    Text { visible: root.networks.length === 0; text: "scanning…"; color: root.cInkFaint; font.family: root.mono; font.pixelSize: 11 }
+                                    Repeater {
+                                        model: root.networks
+                                        delegate: ColumnLayout {
+                                            Layout.fillWidth: true; spacing: 4
+                                            Item {
+                                                Layout.fillWidth: true; Layout.preferredHeight: 32
+                                                RowLayout {
+                                                    anchors.fill: parent; spacing: 8
+                                                    Text { text: "\uf1eb"; font.family: root.mono; font.pixelSize: 13; color: modelData.inuse ? root.cHot : root.cInkSoft; opacity: 0.35 + 0.65 * (modelData.signal / 100) }
+                                                    ColumnLayout {
+                                                        Layout.fillWidth: true; spacing: 0
+                                                        Text { Layout.fillWidth: true; text: modelData.ssid; elide: Text.ElideRight; color: modelData.inuse ? root.cInk : root.cInkSoft; font.family: root.mono; font.pixelSize: 12; font.bold: modelData.inuse }
+                                                        Text { visible: modelData.inuse; text: "connected"; color: root.cInkFaint; font.family: root.mono; font.pixelSize: 9 }
+                                                    }
+                                                    Text { visible: modelData.security !== ""; text: "\uf023"; font.family: root.mono; font.pixelSize: 10; color: root.cInkFaint }
+                                                    Text { text: modelData.signal + "%"; font.family: root.mono; font.pixelSize: 10; color: root.cInkFaint }
+                                                }
+                                                MouseArea { anchors.fill: parent; onClicked: root.wifiClick(modelData) }
+                                            }
+                                            RowLayout {
+                                                Layout.fillWidth: true; visible: root.wifiExpanded === modelData.ssid; spacing: 6
+                                                TextField {
+                                                    id: pwField; Layout.fillWidth: true
+                                                    echoMode: TextInput.Password; placeholderText: "password"
+                                                    font.family: root.mono; font.pixelSize: 11
+                                                    onAccepted: { wifiConn.run(["device","wifi","connect", modelData.ssid, "password", text]); root.wifiExpanded = "" }
+                                                }
+                                                Text { text: "\uf061"; font.family: root.mono; font.pixelSize: 13; color: root.cHot
+                                                       MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: { wifiConn.run(["device","wifi","connect", modelData.ssid, "password", pwField.text]); root.wifiExpanded = "" } } }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         // ---- NETWORK / BLUETOOTH / NOTIFY (minimal real views) ----
                         Repeater {
                             model: [
-                                { v:"network",   l:"Network",       note:"Wi-Fi " + (root.wifiOn ? "on" : "off") },
                                 { v:"bluetooth", l:"Bluetooth",     note:"Bluetooth " + (root.btOn ? "on" : "off") },
                                 { v:"notify",    l:"Notifications", note:"No notifications" }
                             ]
