@@ -63,6 +63,16 @@ PanelWindow {
     property real memTotal: 0
     property real netDown: 0                     // KB/s
     property real netUp: 0
+    property var ramHist: []
+    property var gpuHist: []
+    property var diskHist: []
+    property var netHist: []
+    property var tempHist: []
+    property real gpuNow: 0
+    property real gpuTemp: 0
+    property real diskNow: 0          // MB/s (read+write)
+    property var _prevDisk: null
+    function pushHist(arr, v) { var h = arr.slice(); h.push(v); while (h.length > 60) h.shift(); return h }
 
     // ---- media state -----------------------------------------------------
     property string mStatus: ""
@@ -106,6 +116,7 @@ PanelWindow {
         mediaProc.running = true; statProc.running = true
         tempProc.running = true; memProc.running = true; netProc.running = true
         audioProc.running = true
+        gpuProc.running = true; diskProc.running = true
     }
 
     Behavior on implicitHeight { NumberAnimation { duration: 260; easing.type: Easing.OutExpo } }
@@ -167,7 +178,6 @@ PanelWindow {
                         let h = root.cpuHist.slice(); h.push(root.cpuNow)
                         while (h.length > 60) h.shift()
                         root.cpuHist = h
-                        spark.requestPaint()
                     }
                 }
                 root._prevCpu = { total: total, idle: idle }
@@ -178,12 +188,12 @@ PanelWindow {
     Process {
         id: tempProc
         command: ["sh","-c","sensors coretemp-isa-0000 2>/dev/null | awk '/Package id 0:/ {t=$4; gsub(/[+°C]/,\"\",t); print t; exit}'"]
-        stdout: SplitParser { onRead: d => { const v = parseFloat(d.trim()); if (!isNaN(v)) root.tempNow = v } }
+        stdout: SplitParser { onRead: d => { const v = parseFloat(d.trim()); if (!isNaN(v)) { root.tempNow = v; root.tempHist = root.pushHist(root.tempHist, v) } } }
     }
     Process {
         id: memProc; command: ["sh","-c","free -m | awk '/^Mem:/ {print $3, $2}'"]
         stdout: SplitParser {
-            onRead: d => { const p = d.trim().split(/\s+/); if (p.length>=2){ root.memUsed=+p[0]; root.memTotal=+p[1] } }
+            onRead: d => { const p = d.trim().split(/\s+/); if (p.length>=2){ root.memUsed=+p[0]; root.memTotal=+p[1]; root.ramHist = root.pushHist(root.ramHist, root.memTotal ? root.memUsed/root.memTotal*100 : 0) } }
         }
     }
     // Net throughput: sum rx/tx across non-lo ifaces, delta / interval.
@@ -206,6 +216,7 @@ PanelWindow {
                     if (dts > 0) {
                         root.netDown = Math.max(0, (rx - root._prevNet.rx) / 1024 / dts)
                         root.netUp   = Math.max(0, (tx - root._prevNet.tx) / 1024 / dts)
+                        root.netHist = root.pushHist(root.netHist, root.netDown + root.netUp)
                     }
                 }
                 root._prevNet = { rx: rx, tx: tx, t: now }
@@ -213,6 +224,45 @@ PanelWindow {
         }
     }
 
+    // GPU (nvidia-smi): utilization % + temperature.
+    Process {
+        id: gpuProc
+        command: ["sh","-c","nvidia-smi --query-gpu=utilization.gpu,temperature.gpu --format=csv,noheader,nounits 2>/dev/null | head -1"]
+        stdout: SplitParser {
+            onRead: d => {
+                const p = d.trim().split(/,\s*/)
+                if (p.length >= 1 && p[0] !== "") { root.gpuNow = parseFloat(p[0]) || 0; root.gpuHist = root.pushHist(root.gpuHist, root.gpuNow) }
+                if (p.length >= 2) root.gpuTemp = parseFloat(p[1]) || 0
+            }
+        }
+    }
+    // Disk I/O: /proc/diskstats sectors read+written (fields 6 & 10), physical
+    // disks only, delta / interval -> MB/s (sector = 512 bytes).
+    Process {
+        id: diskProc; command: ["sh","-c","cat /proc/diskstats"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                let rd = 0, wr = 0
+                for (const line of text.split("\n")) {
+                    const p = line.trim().split(/\s+/)
+                    if (p.length < 10) continue
+                    const dev = p[2]
+                    // whole disks only (avoids double-counting partitions incl. nvme pN)
+                    if (!/^(sd[a-z]+|vd[a-z]+|hd[a-z]+|nvme[0-9]+n[0-9]+|mmcblk[0-9]+)$/.test(dev)) continue
+                    rd += Number(p[5]) || 0; wr += Number(p[9]) || 0
+                }
+                const now = Date.now()
+                if (root._prevDisk) {
+                    const dts = (now - root._prevDisk.t) / 1000
+                    if (dts > 0) {
+                        root.diskNow = Math.max(0, ((rd - root._prevDisk.rd) + (wr - root._prevDisk.wr)) * 512 / 1e6 / dts)
+                        root.diskHist = root.pushHist(root.diskHist, root.diskNow)
+                    }
+                }
+                root._prevDisk = { rd: rd, wr: wr, t: now }
+            }
+        }
+    }
     // Action processes
     Process { id: lockCmd;  command: ["hyprlock"] }
     Process { id: logoutCmd;command: ["hyprctl","dispatch","exit"] }
@@ -316,6 +366,39 @@ PanelWindow {
     Timer { interval: 1500; running: root.opened; repeat: true; onTriggered: root.refreshAll() }
 
     // ===================== reusable inline components ====================
+    // Small metric card: eyebrow title, filled-area sparkline, current value.
+    component MetricTile: Card {
+        property string title: ""
+        property string valueText: ""
+        property var history: []
+        property real maxV: 100                 // <= 0 means auto-scale to the data
+        ColumnLayout {
+            anchors.fill: parent; anchors.margins: 8; spacing: 2
+            Text { text: title; color: root.cInkFaint; font.family: root.mono; font.pixelSize: 8; font.letterSpacing: 1; font.capitalization: Font.AllUppercase }
+            Canvas {
+                Layout.fillWidth: true; Layout.fillHeight: true; antialiasing: true
+                property var h: history
+                onHChanged: requestPaint()
+                onPaint: {
+                    const ctx = getContext("2d"); ctx.reset()
+                    const w = width, ht = height
+                    if (!h || h.length < 2) return
+                    let mv = maxV
+                    if (mv <= 0) { mv = 1; for (var k = 0; k < h.length; k++) if (h[k] > mv) mv = h[k] }
+                    const n = h.length, dx = w / 59
+                    const yAt = v => ht - Math.max(0, Math.min(1, v / mv)) * ht
+                    ctx.beginPath(); ctx.moveTo(0, ht)
+                    for (var i = 0; i < n; i++) ctx.lineTo(i * dx, yAt(h[i]))
+                    ctx.lineTo((n - 1) * dx, ht); ctx.closePath()
+                    ctx.fillStyle = Qt.rgba(0.733, 0.357, 0.196, 0.18); ctx.fill()
+                    ctx.beginPath(); ctx.moveTo(0, yAt(h[0]))
+                    for (var j = 1; j < n; j++) ctx.lineTo(j * dx, yAt(h[j]))
+                    ctx.lineWidth = 1.5; ctx.strokeStyle = root.cHot; ctx.stroke()
+                }
+            }
+            Text { text: valueText; color: root.cInk; font.family: root.mono; font.pixelSize: 12; font.bold: true }
+        }
+    }
     component Eyebrow: Text {
         color: root.cInkFaint; font.family: root.mono; font.pixelSize: 10
         font.letterSpacing: 2; font.capitalization: Font.AllUppercase
@@ -630,57 +713,20 @@ PanelWindow {
 
                         // ---- MONITOR (performance) ----
                         ColumnLayout {
-                            anchors.fill: parent; spacing: 12
+                            anchors.fill: parent; spacing: 10
                             opacity: root.view === "monitor" ? 1 : 0
                             visible: opacity > 0.01
                             Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutExpo } }
-
                             Eyebrow { text: "Performance" }
-                            Card {
+                            GridLayout {
                                 Layout.fillWidth: true; Layout.fillHeight: true
-                                Canvas {
-                                    id: spark
-                                    anchors.fill: parent; anchors.margins: 12
-                                    antialiasing: true
-                                    onPaint: {
-                                        const ctx = getContext("2d")
-                                        ctx.reset()
-                                        const h = height, w = width, hist = root.cpuHist
-                                        if (hist.length < 2) return
-                                        const n = hist.length
-                                        const dx = w / 59
-                                        const yAt = v => h - (v/100)*h
-                                        // filled area
-                                        ctx.beginPath(); ctx.moveTo(0, h)
-                                        for (let i=0;i<n;i++) ctx.lineTo(i*dx, yAt(hist[i]))
-                                        ctx.lineTo((n-1)*dx, h); ctx.closePath()
-                                        ctx.fillStyle = Qt.rgba(0.733,0.357,0.196,0.18)   // accent @ ~18%
-                                        ctx.fill()
-                                        // line
-                                        ctx.beginPath(); ctx.moveTo(0, yAt(hist[0]))
-                                        for (let i=1;i<n;i++) ctx.lineTo(i*dx, yAt(hist[i]))
-                                        ctx.lineWidth = 2; ctx.strokeStyle = root.cHot; ctx.stroke()
-                                    }
-                                }
-                            }
-                            Hairline { Layout.fillWidth: true }
-                            RowLayout {
-                                Layout.fillWidth: true; spacing: 0
-                                Repeater {
-                                    model: [
-                                        { l:"CPU",  v: Math.round(root.cpuNow) + "%" },
-                                        { l:"TEMP", v: (root.tempNow ? Math.round(root.tempNow) + "°C" : "—") },
-                                        { l:"RAM",  v: (root.memTotal ? Math.round(root.memUsed) + " / " + Math.round(root.memTotal) + "M" : "—") },
-                                        { l:"NET",  v: "↓" + root.netDown.toFixed(0) + " ↑" + root.netUp.toFixed(0) + " K/s" }
-                                    ]
-                                    delegate: ColumnLayout {
-                                        Layout.fillWidth: true; spacing: 2
-                                        Text { text: modelData.l; color: root.cInkFaint; font.family: root.mono
-                                               font.pixelSize: 9; font.letterSpacing: 1; font.capitalization: Font.AllUppercase }
-                                        Text { text: modelData.v; color: root.cInk; font.family: root.mono
-                                               font.pixelSize: 13; font.bold: true }
-                                    }
-                                }
+                                columns: 2; rowSpacing: 10; columnSpacing: 10
+                                MetricTile { Layout.fillWidth: true; Layout.fillHeight: true; title: "CPU";  history: root.cpuHist;  maxV: 100; valueText: Math.round(root.cpuNow) + "%" }
+                                MetricTile { Layout.fillWidth: true; Layout.fillHeight: true; title: "RAM";  history: root.ramHist;  maxV: 100; valueText: root.memTotal ? Math.round(root.memUsed / root.memTotal * 100) + "%" : "-" }
+                                MetricTile { Layout.fillWidth: true; Layout.fillHeight: true; title: "GPU";  history: root.gpuHist;  maxV: 100; valueText: Math.round(root.gpuNow) + "%" }
+                                MetricTile { Layout.fillWidth: true; Layout.fillHeight: true; title: "DISK"; history: root.diskHist; maxV: 0;   valueText: root.diskNow.toFixed(1) + " M/s" }
+                                MetricTile { Layout.fillWidth: true; Layout.fillHeight: true; title: "NET";  history: root.netHist;  maxV: 0;   valueText: "\u2193" + root.netDown.toFixed(0) + " \u2191" + root.netUp.toFixed(0) }
+                                MetricTile { Layout.fillWidth: true; Layout.fillHeight: true; title: "TEMP"; history: root.tempHist; maxV: 100; valueText: root.tempNow ? Math.round(root.tempNow) + "\u00b0C" : "-" }
                             }
                         }
 
