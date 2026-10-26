@@ -1,6 +1,8 @@
 alsa-utils
 base
 base-devel
+bluez
+bluez-utils
 brightnessctl
 dunst
 efibootmgr
