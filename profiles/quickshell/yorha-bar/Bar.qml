@@ -28,15 +28,15 @@ PanelWindow {
     }
     Component.onCompleted: posProc.running = true
 
-    // Live palette (Palette.qml ← ~/.config/yorha/colors.css; light by default).
-    readonly property color cSand:     Palette.sand       // bar fill
-    readonly property color cPanel:    Palette.panel      // capsule fill
-    readonly property color cInk:      Palette.ink        // primary text
-    readonly property color cInkSoft:  Palette.inkSoft    // secondary text
-    readonly property color cInkFaint: Palette.inkFaint   // muted text
-    readonly property color cRule:     Palette.rule
-    readonly property color cHot:      Palette.hot        // accent
-    readonly property color cActiveText: Palette.sand     // label on accent
+    // Live palette (YorhaTheme.qml ← ~/.config/yorha/colors.css; light by default).
+    readonly property color cSand:     YorhaTheme.sand       // bar fill
+    readonly property color cPanel:    YorhaTheme.panel      // capsule fill
+    readonly property color cInk:      YorhaTheme.ink        // primary text
+    readonly property color cInkSoft:  YorhaTheme.inkSoft    // secondary text
+    readonly property color cInkFaint: YorhaTheme.inkFaint   // muted text
+    readonly property color cRule:     YorhaTheme.rule
+    readonly property color cHot:      YorhaTheme.hot        // accent
+    readonly property color cActiveText: YorhaTheme.sand     // label on accent
     readonly property string mono: "JetBrainsMono Nerd Font"
 
     // Event-driven from Hyprland's IPC socket — updates the instant you switch

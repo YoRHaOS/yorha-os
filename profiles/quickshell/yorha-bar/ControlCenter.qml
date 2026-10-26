@@ -34,16 +34,16 @@ PanelWindow {
     function openView(v) { view = v; if (!opened) { opened = true; refreshAll() } }
     onViewChanged: if (view === "settings") settingsProc.running = true
 
-    // ---- live palette (Palette.qml ← ~/.config/yorha/colors.css) ---------
-    readonly property color cSand:      Palette.sand       // panel base
-    readonly property color cSandDeep:  Palette.sandDeep   // rail (recessed)
-    readonly property color cPanel:     Palette.panel      // card fill (lifted)
-    readonly property color cInk:       Palette.ink        // primary text
-    readonly property color cInkSoft:   Palette.inkSoft    // secondary text
-    readonly property color cInkFaint:  Palette.inkFaint   // muted text
-    readonly property color cRule:      Palette.rule       // hairlines
-    readonly property color cHot:       Palette.hot        // accent
-    readonly property color cActiveText:Palette.sand       // label on accent fill
+    // ---- live palette (YorhaTheme.qml ← ~/.config/yorha/colors.css) ---------
+    readonly property color cSand:      YorhaTheme.sand       // panel base
+    readonly property color cSandDeep:  YorhaTheme.sandDeep   // rail (recessed)
+    readonly property color cPanel:     YorhaTheme.panel      // card fill (lifted)
+    readonly property color cInk:       YorhaTheme.ink        // primary text
+    readonly property color cInkSoft:   YorhaTheme.inkSoft    // secondary text
+    readonly property color cInkFaint:  YorhaTheme.inkFaint   // muted text
+    readonly property color cRule:      YorhaTheme.rule       // hairlines
+    readonly property color cHot:       YorhaTheme.hot        // accent
+    readonly property color cActiveText:YorhaTheme.sand       // label on accent fill
     readonly property string mono: "JetBrainsMono Nerd Font"
 
     // ---- quick toggles (Home tiles) ---------------------------------------

@@ -24,6 +24,9 @@ mkdir -p "$cfg/hypr"
 cp profiles/hyprland/hyprland.conf "$cfg/hypr/hyprland.conf"
 
 echo ":: applying yorha-bar"
+# Replace the folder outright so files deleted/renamed in the repo don't linger
+# (user settings live in ~/.config/yorha/, not here, so nothing personal is lost).
+rm -rf "$cfg/quickshell/yorha-bar"
 mkdir -p "$cfg/quickshell/yorha-bar"
 cp -r profiles/quickshell/yorha-bar/. "$cfg/quickshell/yorha-bar/"
 
