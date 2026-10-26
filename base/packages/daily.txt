@@ -1,0 +1,14 @@
+# Aki's daily driver (branch aki/daily) — on top of base/packages/explicit.txt.
+# Install: sudo pacman -S --needed - < base/packages/daily.txt
+dms-shell
+quickshell
+matugen
+kimageformats
+intel-media-driver
+libva-utils
+jq
+swappy
+libnotify
+xdg-user-dirs
+playerctl
+power-profiles-daemon
