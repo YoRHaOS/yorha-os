@@ -1,6 +1,7 @@
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Io
+import Quickshell.Hyprland
 import QtQuick
 import QtQuick.Layouts
 
@@ -38,22 +39,15 @@ PanelWindow {
     readonly property color cActiveText:"#d3cdb6"  // label on accent
     readonly property string mono: "JetBrainsMono Nerd Font"
 
-    property int activeWorkspace: 1
+    // Event-driven from Hyprland's IPC socket — updates the instant you switch
+    // (click, keybind, or anything else), no polling.
+    readonly property int activeWorkspace: Hyprland.focusedWorkspace ? Hyprland.focusedWorkspace.id : 1
 
     // Single unified panel; capsules open it at a specific view.
     property var controlCenterRef
 
     // Rounded floating capsule (no longer a full-width edge strip)
     Rectangle { anchors.fill: parent; radius: 10; color: bar.cSand }
-
-    Process {
-        id: activeWsProc
-        command: ["hyprctl", "activeworkspace", "-j"]
-        stdout: SplitParser {
-            onRead: data => { try { bar.activeWorkspace = JSON.parse(data).id } catch (e) {} }
-        }
-    }
-    Timer { interval: 500; running: true; repeat: true; onTriggered: activeWsProc.running = true }
 
     RowLayout {
         id: barRow
@@ -87,7 +81,7 @@ PanelWindow {
                         }
                         MouseArea {
                             anchors.fill: parent
-                            onClicked: wsProc.exec(["hyprctl","dispatch","workspace",(index+1).toString()])
+                            onClicked: Hyprland.dispatch("workspace " + (index + 1))
                         }
                     }
                 }
@@ -154,5 +148,4 @@ PanelWindow {
         }
     }
 
-    Process { id: wsProc; function exec(cmd) { command = cmd; running = true } }
 }
