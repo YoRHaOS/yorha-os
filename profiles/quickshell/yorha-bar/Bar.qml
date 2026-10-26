@@ -28,15 +28,15 @@ PanelWindow {
     }
     Component.onCompleted: posProc.running = true
 
-    // Locked LIGHT palette (docs/visual-identity.md) — no wallust dark values.
-    readonly property color cSand:     "#d3cdb6"   // bar fill
-    readonly property color cPanel:    "#dcd7c3"   // capsule fill
-    readonly property color cInk:      "#4a4739"   // primary text
-    readonly property color cInkSoft:  "#6b6754"   // secondary text
-    readonly property color cInkFaint: "#8d8873"   // muted text
-    readonly property color cRule:     "#8d8873"
-    readonly property color cHot:      "#bb5b32"   // accent
-    readonly property color cActiveText:"#d3cdb6"  // label on accent
+    // Live palette (Palette.qml ← ~/.config/yorha/colors.css; light by default).
+    readonly property color cSand:     Palette.sand       // bar fill
+    readonly property color cPanel:    Palette.panel      // capsule fill
+    readonly property color cInk:      Palette.ink        // primary text
+    readonly property color cInkSoft:  Palette.inkSoft    // secondary text
+    readonly property color cInkFaint: Palette.inkFaint   // muted text
+    readonly property color cRule:     Palette.rule
+    readonly property color cHot:      Palette.hot        // accent
+    readonly property color cActiveText: Palette.sand     // label on accent
     readonly property string mono: "JetBrainsMono Nerd Font"
 
     // Event-driven from Hyprland's IPC socket — updates the instant you switch

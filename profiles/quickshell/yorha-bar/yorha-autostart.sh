@@ -17,7 +17,10 @@ start() {
   "$@" &
 }
 
-start waybar   waybar
+# The bar itself always starts (it's what hosts the toggles — it can't switch
+# itself off). Waybar is retired; it's no longer launched.
+pgrep -f "qs -c yorha-bar" >/dev/null 2>&1 || qs -c yorha-bar &
+
 start dunst    dunst
 start hypridle hypridle
 start hyprpaper hyprpaper

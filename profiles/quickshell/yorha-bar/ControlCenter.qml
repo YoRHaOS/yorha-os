@@ -34,25 +34,30 @@ PanelWindow {
     function openView(v) { view = v; if (!opened) { opened = true; refreshAll() } }
     onViewChanged: if (view === "settings") settingsProc.running = true
 
-    // ---- locked light palette (docs/visual-identity.md) ------------------
-    readonly property color cSand:      "#d3cdb6"   // panel base
-    readonly property color cSandDeep:  "#c6bfa4"   // rail (recessed)
-    readonly property color cPanel:     "#dcd7c3"   // card fill (lifted)
-    readonly property color cInk:       "#4a4739"   // primary text
-    readonly property color cInkSoft:   "#6b6754"   // secondary text
-    readonly property color cInkFaint:  "#8d8873"   // muted text
-    readonly property color cRule:      "#8d8873"   // hairlines
-    readonly property color cHot:       "#bb5b32"   // accent
-    readonly property color cActiveText:"#d3cdb6"   // label on accent fill
+    // ---- live palette (Palette.qml ← ~/.config/yorha/colors.css) ---------
+    readonly property color cSand:      Palette.sand       // panel base
+    readonly property color cSandDeep:  Palette.sandDeep   // rail (recessed)
+    readonly property color cPanel:     Palette.panel      // card fill (lifted)
+    readonly property color cInk:       Palette.ink        // primary text
+    readonly property color cInkSoft:   Palette.inkSoft    // secondary text
+    readonly property color cInkFaint:  Palette.inkFaint   // muted text
+    readonly property color cRule:      Palette.rule       // hairlines
+    readonly property color cHot:       Palette.hot        // accent
+    readonly property color cActiveText:Palette.sand       // label on accent fill
     readonly property string mono: "JetBrainsMono Nerd Font"
 
-    // ---- toggle state ----------------------------------------------------
+    // ---- quick toggles (Home tiles) ---------------------------------------
+    // State comes from toggles-status.sh, so tiles show what the system is
+    // actually doing. A click flips the tile instantly (optimistic), runs the
+    // real command, then re-reads state to confirm.
     property bool wifiOn: true
     property bool btOn: false
-    property bool caffeineOn: false
+    property bool caffeineOn: false             // owned by the bar: an idle inhibitor it holds open
     property bool nightLightOn: false
     property bool dndOn: false
-    property bool perfMode: false               // "Power Profile" tile
+    property string powerProfile: ""            // power-saver | balanced | performance
+    readonly property bool saverOn: powerProfile === "power-saver"
+    readonly property string togglesScript: Qt.resolvedUrl("toggles-status.sh").toString().replace(/^file:\/\//, "")
 
     // ---- rolling metric history (Monitor view) ---------------------------
     property var cpuHist: []
@@ -108,7 +113,7 @@ PanelWindow {
     // ---- settings (panel.conf via yorha-settings.sh) --------------------
     property var settings: ({})      // KEY -> value
     readonly property string settingsScript: Qt.resolvedUrl("yorha-settings.sh").toString().replace(/^file:\/\//, "")
-    readonly property var autostartItems: ["waybar", "dunst", "hypridle", "hyprpaper"]
+    readonly property var autostartItems: ["dunst", "hypridle", "hyprpaper"]
     function autostartOn(name) { return root.settings["AUTOSTART_" + name] !== "0" }   // default on
     function setKV(k, v) { settingsSet.set(k, v); var m = Object.assign({}, root.settings); m[k] = v; root.settings = m }
 
@@ -125,6 +130,7 @@ PanelWindow {
         tempProc.running = true; memProc.running = true; netProc.running = true
         audioProc.running = true
         gpuProc.running = true; diskProc.running = true
+        togglesProc.running = true
     }
 
     Behavior on implicitHeight { NumberAnimation { duration: 260; easing.type: Easing.OutExpo } }
@@ -271,10 +277,67 @@ PanelWindow {
             }
         }
     }
-    // Action processes
-    Process { id: lockCmd;  command: ["hyprlock"] }
-    Process { id: logoutCmd;command: ["hyprctl","dispatch","exit"] }
-    Process { id: powerCmd; command: ["systemctl","poweroff"] }
+    // ---- quick toggles: state + actions ----------------------------------
+    Process { id: togglesProc; command: ["sh", root.togglesScript]
+        stdout: StdioCollector { onStreamFinished: root.parseToggles(text) } }
+    Timer { id: togglesFollow; interval: 800; repeat: false; onTriggered: togglesProc.running = true }
+    function parseToggles(text) {
+        for (const line of text.split("\n")) {
+            const f = line.split("\t")
+            if (f.length < 2) continue
+            if (f[0] === "WIFI")         root.wifiOn = f[1] === "1"
+            else if (f[0] === "BT")      root.btOn = f[1] === "1"
+            else if (f[0] === "DND")     root.dndOn = f[1] === "1"
+            else if (f[0] === "NIGHT")   root.nightLightOn = f[1] === "1"
+            else if (f[0] === "PROFILE") root.powerProfile = f[1].trim()
+        }
+    }
+    // Caffeine: while this process runs, systemd holds an idle inhibitor and
+    // hypridle won't dim/lock/suspend. Turning the tile off ends the process.
+    Process {
+        running: root.caffeineOn
+        command: ["systemd-inhibit", "--what=idle", "--who=YoRHa OS", "--why=Caffeine", "sleep", "infinity"]
+    }
+    function quickToggle(k) {
+        // execDetached = fire-and-forget, so a slow command can never swallow
+        // the next click (the old reused-Process pattern could).
+        switch (k) {
+        case "wifi":
+            root.wifiOn = !root.wifiOn
+            Quickshell.execDetached(["nmcli", "radio", "wifi", root.wifiOn ? "on" : "off"]); break
+        case "bt":
+            root.btOn = !root.btOn
+            Quickshell.execDetached(["sh", "-c", root.btOn
+                ? "rfkill unblock bluetooth; bluetoothctl power on"
+                : "bluetoothctl power off"]); break
+        case "caf":
+            root.caffeineOn = !root.caffeineOn; return   // no system state to re-read
+        case "night":
+            root.nightLightOn = !root.nightLightOn
+            Quickshell.execDetached(root.nightLightOn ? ["hyprsunset", "-t", "4000"] : ["pkill", "-x", "hyprsunset"]); break
+        case "dnd":
+            root.dndOn = !root.dndOn
+            Quickshell.execDetached(["dunstctl", "set-paused", root.dndOn ? "true" : "false"]); break
+        case "saver":
+            root.powerProfile = root.saverOn ? "balanced" : "power-saver"
+            Quickshell.execDetached(["powerprofilesctl", "set", root.powerProfile]); break
+        }
+        togglesFollow.restart()
+    }
+
+    // ---- session actions (header buttons) ----------------------------------
+    // Power off needs two clicks within 3s — one stray click shouldn't kill the machine.
+    property bool powerArmed: false
+    Timer { id: powerDisarm; interval: 3000; onTriggered: root.powerArmed = false }
+    function sessionAction(act) {
+        if (act === "close") root.opened = false
+        else if (act === "settings") root.view = "settings"
+        else if (act === "lock") { root.opened = false; Quickshell.execDetached(["hyprlock"]) }
+        else if (act === "power") {
+            if (root.powerArmed) Quickshell.execDetached(["systemctl", "poweroff"])
+            else { root.powerArmed = true; powerDisarm.restart() }
+        }
+    }
     // Same --player selection as mediaProc so the buttons control the player shown.
     Process { id: mprev; function go(){ command=["playerctl","--player=spotify,%any","previous"]; running=true } }
     Process { id: mplay; function go(){ command=["playerctl","--player=spotify,%any","play-pause"]; running=true } }
@@ -528,24 +591,28 @@ PanelWindow {
                         anchors.top: parent.top; anchors.right: parent.right
                         anchors.topMargin: 12; anchors.rightMargin: 16
                         spacing: 10
+                        Text {
+                            visible: root.powerArmed
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "CLICK AGAIN TO SHUT DOWN"
+                            font.family: root.mono; font.pixelSize: 9; font.letterSpacing: 1
+                            color: root.cHot
+                        }
                         Repeater {
                             model: [
                                 { g: "\uf013", act: "settings" },
+                                { g: "\uf023", act: "lock" },
                                 { g: "\uf011", act: "power" },
                                 { g: "\uf00d", act: "close" }
                             ]
                             delegate: Text {
                                 text: modelData.g; font.family: root.mono; font.pixelSize: 13
-                                color: root.cInkFaint
+                                color: btnMa.containsMouse || (modelData.act === "power" && root.powerArmed)
+                                       ? root.cHot : root.cInkFaint
                                 MouseArea {
+                                    id: btnMa
                                     anchors.fill: parent; anchors.margins: -4; hoverEnabled: true
-                                    onEntered: parent.color = root.cHot
-                                    onExited: parent.color = root.cInkFaint
-                                    onClicked: {
-                                        if (modelData.act === "close") root.opened = false
-                                        else if (modelData.act === "power") powerCmd.running = true
-                                        else if (modelData.act === "settings") { root.view = "settings"; settingsProc.running = true }
-                                    }
+                                    onClicked: root.sessionAction(modelData.act)
                                 }
                             }
                         }
@@ -658,7 +725,7 @@ PanelWindow {
                                             { k:"caf",   g:"\uf0f4", l:"Caffeine" },
                                             { k:"night", g:"\uf186", l:"Night Light" },
                                             { k:"dnd",   g:"\uf1f6", l:"DND" },
-                                            { k:"power", g:"\uf0e7", l:"Power" }
+                                            { k:"saver", g:"\uf06c", l:"Saver" }
                                         ]
                                         delegate: Rectangle {
                                             Layout.fillWidth: true; Layout.fillHeight: true
@@ -670,8 +737,9 @@ PanelWindow {
                                                     case "caf":   return root.caffeineOn
                                                     case "night": return root.nightLightOn
                                                     case "dnd":   return root.dndOn
-                                                    case "power": return root.perfMode
+                                                    case "saver": return root.saverOn
                                                 }
+                                                return false
                                             }
                                             color: on ? root.cHot : root.cPanel
                                             Behavior on color { ColorAnimation { duration: 180; easing.type: Easing.OutExpo } }
@@ -689,16 +757,7 @@ PanelWindow {
                                             }
                                             MouseArea {
                                                 anchors.fill: parent
-                                                onClicked: {
-                                                    switch (modelData.k) {
-                                                        case "wifi":  root.wifiOn = !root.wifiOn; break
-                                                        case "bt":    root.btOn = !root.btOn; break
-                                                        case "caf":   root.caffeineOn = !root.caffeineOn; break
-                                                        case "night": root.nightLightOn = !root.nightLightOn; break
-                                                        case "dnd":   root.dndOn = !root.dndOn; break
-                                                        case "power": root.perfMode = !root.perfMode; break
-                                                    }
-                                                }
+                                                onClicked: root.quickToggle(modelData.k)
                                             }
                                         }
                                     }
@@ -1097,9 +1156,11 @@ PanelWindow {
             // faint scanline overlay
             Canvas {
                 anchors.fill: parent; z: 15; opacity: 0.05
+                property color lineColor: root.cInk          // repaint when the theme flips
+                onLineColorChanged: requestPaint()
                 onPaint: {
                     const ctx = getContext("2d"); ctx.reset()
-                    ctx.strokeStyle = "#4a4739"; ctx.lineWidth = 1
+                    ctx.strokeStyle = root.cInk; ctx.lineWidth = 1
                     for (let y = 0.5; y < height; y += 3) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(width,y); ctx.stroke() }
                 }
                 Component.onCompleted: requestPaint()
